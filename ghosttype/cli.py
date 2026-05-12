@@ -39,7 +39,7 @@ def scan(tool: str | None, fmt: str, output: str, no_redact: bool, context_windo
         console.print(f"[green]{len(findings)} finding(s) discovered.[/green]")
 
     if fmt in ("json", "both"):
-        write_json(findings, out_dir / "findings.json")
+        write_json(findings, out_dir / "findings.json", redact=not no_redact)
     if fmt in ("csv", "both"):
         write_csv(findings, out_dir / "findings.csv", redact=not no_redact)
 

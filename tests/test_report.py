@@ -39,6 +39,13 @@ def test_write_json_creates_valid_file(tmp_path, findings):
     assert data[0]["confidence"] == "high"
 
 
+def test_write_json_redacts_when_requested(tmp_path, findings):
+    out = tmp_path / "findings.json"
+    write_json(findings, out, redact=True)
+    data = json.loads(out.read_text())
+    assert data[0]["secret_value"] == "***REDACTED***"
+
+
 def test_write_csv_redacts_by_default(tmp_path, findings):
     out = tmp_path / "findings.csv"
     write_csv(findings, out, redact=True)

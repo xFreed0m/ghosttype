@@ -81,7 +81,7 @@ class ChatGPTScanner(Scanner):
             aesgcm = AESGCM(key)
             plaintext = aesgcm.decrypt(iv, ciphertext, None)
             return plaintext.decode("utf-8", errors="replace")
-        except Exception:
+        except (ValueError, KeyError, UnicodeDecodeError, TypeError):
             return None
 
     def extract_text(self, record: ConversationRecord) -> list[TextChunk]:

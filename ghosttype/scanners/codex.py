@@ -31,11 +31,10 @@ class CodexScanner(Scanner):
             return []
         records: list[ConversationRecord] = []
         try:
-            conn = sqlite3.connect(f"file:{state_db}?mode=ro", uri=True)
-            rows = conn.execute(
-                "SELECT id, title, first_user_message, created_at FROM threads"
-            ).fetchall()
-            conn.close()
+            with sqlite3.connect(f"file:{state_db}?mode=ro", uri=True) as conn:
+                rows = conn.execute(
+                    "SELECT id, title, first_user_message, created_at FROM threads"
+                ).fetchall()
         except sqlite3.Error:
             return []
 
@@ -77,18 +76,17 @@ class CodexScanner(Scanner):
         logs_db = self._logs_db()
         if logs_db.exists():
             try:
-                conn = sqlite3.connect(f"file:{logs_db}?mode=ro", uri=True)
-                # thread_id is stored in logs via thread_id column if present
-                # Try with thread_id filter; if column doesn't exist, skip
-                try:
-                    rows = conn.execute(
-                        "SELECT feedback_log_body FROM logs WHERE thread_id = ? AND feedback_log_body IS NOT NULL",
-                        (thread_id,),
-                    ).fetchall()
-                except sqlite3.OperationalError:
-                    # thread_id column may not exist in all versions
-                    rows = []
-                conn.close()
+                with sqlite3.connect(f"file:{logs_db}?mode=ro", uri=True) as conn:
+                    # thread_id is stored in logs via thread_id column if present
+                    # Try with thread_id filter; if column doesn't exist, skip
+                    try:
+                        rows = conn.execute(
+                            "SELECT feedback_log_body FROM logs WHERE thread_id = ? AND feedback_log_body IS NOT NULL",
+                            (thread_id,),
+                        ).fetchall()
+                    except sqlite3.OperationalError:
+                        # thread_id column may not exist in all versions
+                        rows = []
                 for (body,) in rows:
                     if body and body.strip():
                         chunks.append(TextChunk(

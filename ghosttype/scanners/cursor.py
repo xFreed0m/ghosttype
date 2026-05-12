@@ -32,11 +32,10 @@ class CursorScanner(Scanner):
             return []
         records: list[ConversationRecord] = []
         try:
-            conn = sqlite3.connect(f"file:{self._db_path}?mode=ro", uri=True)
-            rows = conn.execute(
-                "SELECT key, value FROM cursorDiskKV WHERE key LIKE 'composerData:%'"
-            ).fetchall()
-            conn.close()
+            with sqlite3.connect(f"file:{self._db_path}?mode=ro", uri=True) as conn:
+                rows = conn.execute(
+                    "SELECT key, value FROM cursorDiskKV WHERE key LIKE 'composerData:%'"
+                ).fetchall()
         except sqlite3.Error:
             return []
 
