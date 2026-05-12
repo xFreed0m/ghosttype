@@ -143,9 +143,30 @@ def _shannon_entropy(s: str) -> float:
     return -sum((v / len(s)) * math.log2(v / len(s)) for v in freq.values())
 
 
+# Well-known documentation/example credential values that should never be reported.
+# These appear in official docs, tutorials, and test suites worldwide.
+_KNOWN_EXAMPLE_VALUES: frozenset[str] = frozenset({
+    # AWS documentation canonical example credentials
+    "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+    "AKIAIOSFODNN7EXAMPLE",
+    # Famous test passwords
+    "hunter2supersecretvalue",
+    "hunter2",
+    "correcthorsebatterystaple",
+    # JWT example from jwt.io
+    "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+    # Generic doc examples
+    "mysecretpassword123",
+    "mysupersecretkey",
+    "thisisasecret",
+})
+
+
 def _is_likely_placeholder(value: str) -> bool:
     """Return True if the value looks like a placeholder, not a real credential."""
     if len(value) < 8:
+        return True
+    if value in _KNOWN_EXAMPLE_VALUES:
         return True
     if _PLACEHOLDER_STEMS.match(value):
         return True

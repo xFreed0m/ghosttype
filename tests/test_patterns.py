@@ -49,13 +49,13 @@ def test_detects_pem_private_key():
 
 
 def test_heuristic_detects_api_key_assignment():
-    text = "api_key = 'hunter2supersecretvalue'"
+    text = "api_key = 'xK9mR3pL8nQ2vZ5sY1wJ4eU7tH'"
     matches = scan_text(text)
     assert any(m.secret_type == "heuristic_api_key" and m.confidence == "medium" for m in matches)
 
 
 def test_heuristic_detects_password_assignment():
-    text = "password: mysecretpassword123"
+    text = "password: Tr0ub4dor&3xamplePa55!"
     matches = scan_text(text)
     assert any(m.secret_type == "heuristic_password" and m.confidence == "medium" for m in matches)
 
