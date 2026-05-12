@@ -18,10 +18,13 @@ ghosttype walks the local filesystem looking for conversation history files from
 
 For each discovered conversation, it runs a two-layer detection engine:
 
-1. **Regex patterns** - known credential formats: AWS keys, OpenAI tokens, GitHub PATs, GCP service accounts, private keys, JWTs, connection strings, generic API key patterns
-2. **Heuristic signals** - contextual variable names (`api_key =`, `password:`, `token =`) that indicate secrets even when the value doesn't match a known format
+1. **Regex patterns** - 30+ known credential formats across cloud providers and services
+2. **Heuristic signals** - contextual variable name patterns (`api_key =`, `password:`, `JWT_SECRET=`) with entropy filtering to reduce false positives
 
-Output is a structured report (CSV and/or JSON) where each row includes the tool name, secret type, redacted secret value, source file path, line/position, confidence score, and timestamp.
+**Detected credential types include:**
+AWS access/secret keys, OpenAI tokens (sk-, sk-proj-), Anthropic API keys, GitHub PATs (ghp_, ghs_, ghu_), Stripe keys (sk_live_, sk_test_), Slack tokens (xoxb-, xoxp-), HashiCorp Vault tokens (hvs., hvb.), Linear API keys, Databricks tokens, npm tokens, SendGrid, Telegram bot tokens, Hugging Face tokens, DigitalOcean tokens, GCP service accounts, JWT tokens, PEM private keys, database connection strings, and more.
+
+Output is a structured JSON and/or CSV report with each finding linked to its source conversation file.
 
 ---
 
@@ -32,19 +35,33 @@ Output is a structured report (CSV and/or JSON) where each row includes the tool
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e .
 
-# Scan current machine, output to ./ghosttype_report/
+# Scan all detected AI tools, output to ./ghosttype_report/
 ghosttype scan
 
-# Specific tool only
+# Scan a specific tool
 ghosttype scan --tool cursor
+ghosttype scan --tool claude_code
 
-# Choose output format
-ghosttype scan --format json
-ghosttype scan --format csv
-ghosttype scan --format both  # default
+# Filter to high-confidence findings only (reduces noise)
+ghosttype scan --min-confidence high
 
-# Output directory
-ghosttype scan --output /tmp/loot
+# Only show stats, don't print every finding
+ghosttype scan --stats-only
+
+# Redact secret values in output (safe for sharing)
+ghosttype scan --redact
+
+# Copy source conversation files to output dir (for evidence)
+ghosttype scan --copy-sources --output /tmp/loot
+
+# Suppress known-safe values (reviewed FPs)
+ghosttype scan --allow-list .ghosttype-allowlist
+
+# Show which tools are detected on this machine
+ghosttype list-tools
+
+# Print version
+ghosttype version
 ```
 
 ---
@@ -59,18 +76,24 @@ ghosttype scan --output /tmp/loot
 
 ## Output schema
 
-Each finding row:
+Each finding:
 
 | Field | Description |
 |-------|-------------|
-| `tool` | Source AI tool (e.g., `cursor`, `claude_code`) |
-| `secret_type` | Pattern category (e.g., `aws_access_key`, `openai_token`) |
-| `secret_value` | The matched value (shown in full in JSON; redacted in CSV by default) |
+| `tool` | Source AI tool (`cursor`, `claude_code`, `chatgpt`, `codex`, `claude`) |
+| `secret_type` | Credential category (`aws_access_key`, `openai_token`, `stripe_secret_key`, ...) |
+| `severity` | `critical` (highest-value keys), `high` (other regex matches), `medium` (heuristic) |
+| `secret_value` | The matched value (plaintext by default; use `--redact` to mask) |
 | `file_path` | Absolute path to the source conversation file |
-| `position` | Line number or byte offset within the file |
+| `position` | Line number or row key within the file |
 | `confidence` | `high` (known regex match) or `medium` (heuristic signal) |
-| `context` | Surrounding text snippet (configurable window) |
+| `context` | 200-character window centered on the match |
 | `discovered_at` | Timestamp of the scan |
+
+Output directory (default `./ghosttype_report/`):
+- `findings.json` - full detail, plaintext values by default
+- `findings.csv` - tabular, same values (use `--redact` to mask)
+- `sources/<tool>/` - copies of source conversation files with findings (opt-in: `--copy-sources`)
 
 ---
 
