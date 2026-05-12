@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from collections import Counter
 from pathlib import Path
 
 import click
+from rich.columns import Columns
 from rich.console import Console
 from rich.table import Table
 
@@ -29,6 +31,13 @@ def cli() -> None:
 
 
 @cli.command()
+def version() -> None:
+    """Print version information."""
+    console.print("[bold cyan]ghosttype[/bold cyan] [dim]v0.1.0[/dim]")
+    console.print("[dim]credential scanner for AI tool conversation history[/dim]")
+
+
+@cli.command()
 @click.option(
     "--tool",
     default=None,
@@ -47,6 +56,8 @@ def cli() -> None:
     show_default=True,
     help="Minimum confidence level to include (high filters out heuristic matches)",
 )
+@click.option("--allow-list", default=None, type=click.Path(exists=True), help="Path to file with known-safe values to suppress (one per line)")
+@click.option("--stats-only", is_flag=True, default=False, help="Print summary statistics only, not full findings table")
 def scan(
     tool: str | None,
     fmt: str,
@@ -55,6 +66,8 @@ def scan(
     context_window: int,
     copy_sources: bool,
     min_confidence: str,
+    allow_list: str | None,
+    stats_only: bool,
 ) -> None:
     """Scan AI tool conversation files for credentials and secrets."""
     _print_banner()
@@ -67,6 +80,20 @@ def scan(
     findings = orch.run(tool_filter=tool)
     if min_confidence == "high":
         findings = [f for f in findings if f.confidence == "high"]
+
+    # Apply allow-list suppression
+    suppressed_count = 0
+    if allow_list:
+        allowed = set()
+        with open(allow_list) as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    allowed.add(line)
+        suppressed_count = len([f for f in findings if f.secret_value in allowed])
+        findings = [f for f in findings if f.secret_value not in allowed]
+        if allowed:
+            console.print(f"[dim]Allow-list suppressed {suppressed_count} value(s)[/dim]")
 
     console.print(f"[dim]Scanned {orch.files_scanned} conversation file(s)[/dim]")
     if not findings:
@@ -85,7 +112,10 @@ def scan(
     else:
         console.print("[dim]No output files written.[/dim]")
 
-    _print_summary(findings)
+    if not stats_only:
+        _print_summary(findings, orch.files_scanned)
+    else:
+        _print_stats_only(findings, orch.files_scanned)
 
 
 @cli.command("list-tools")
@@ -115,14 +145,58 @@ def _print_banner() -> None:
     )
 
 
-def _print_summary(findings: list[Finding]) -> None:
+def _print_summary(findings: list[Finding], files_scanned: int) -> None:
+    """Print detailed findings table plus statistics."""
     if not findings:
         return
+
+    # Print detailed findings table
     table = Table(title="Findings Summary", show_header=True)
     table.add_column("Tool")
     table.add_column("Type")
+    table.add_column("Severity")
     table.add_column("Confidence")
     table.add_column("File")
     for f in findings:
-        table.add_row(f.tool, f.secret_type, f.confidence, f.file_path.name)
+        severity_style = (
+            "bold red" if f.severity == "critical"
+            else "yellow" if f.severity == "high"
+            else "dim"
+        )
+        table.add_row(
+            f.tool,
+            f.secret_type,
+            f"[{severity_style}]{f.severity}[/{severity_style}]",
+            f.confidence,
+            f.file_path.name,
+        )
     console.print(table)
+
+    # Print statistics breakdown
+    _print_stats_only(findings, files_scanned)
+
+
+def _print_stats_only(findings: list[Finding], files_scanned: int) -> None:
+    """Print summary statistics without the full findings table."""
+    if not findings:
+        return
+
+    files_with_findings = len({f.file_path for f in findings})
+
+    # By type breakdown
+    type_table = Table(title="By Type", show_header=True, box=None)
+    type_table.add_column("Type", style="cyan")
+    type_table.add_column("Count", justify="right")
+    for stype, count in Counter(f.secret_type for f in findings).most_common():
+        type_table.add_row(stype, str(count))
+
+    # By tool breakdown
+    tool_table = Table(title="By Tool", show_header=True, box=None)
+    tool_table.add_column("Tool", style="green")
+    tool_table.add_column("Count", justify="right")
+    for tool, count in Counter(f.tool for f in findings).most_common():
+        tool_table.add_row(tool, str(count))
+
+    console.print()
+    console.print(Columns([type_table, tool_table]))
+    console.print(f"\n[dim]Files scanned: {files_scanned} | Files with findings: {files_with_findings}[/dim]")
