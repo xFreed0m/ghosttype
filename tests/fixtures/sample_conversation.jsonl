@@ -1,0 +1,4 @@
+{"type":"user","message":{"content":"set AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE"},"uuid":"msg-1","sessionId":"sess-1","timestamp":"2026-01-01T00:00:00Z","cwd":"/tmp/project","version":"1.0","userType":"human","parentUuid":null,"isSidechain":false,"entrypoint":"cli","gitBranch":"main"}
+{"type":"assistant","message":{"content":"Got it, I'll use that key."},"uuid":"msg-2","sessionId":"sess-1","timestamp":"2026-01-01T00:00:01Z","cwd":"/tmp/project","version":"1.0","userType":"human","parentUuid":"msg-1","isSidechain":false,"entrypoint":"cli","gitBranch":"main"}
+{"type":"user","message":{"content":[{"type":"text","text":"my password is hunter2"}]},"uuid":"msg-3","sessionId":"sess-1","timestamp":"2026-01-01T00:00:02Z","cwd":"/tmp/project","version":"1.0","userType":"human","parentUuid":"msg-2","isSidechain":false,"entrypoint":"cli","gitBranch":"main"}
+{"type":"permission-mode","permissionMode":"default","sessionId":"sess-1"}
