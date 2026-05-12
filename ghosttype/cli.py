@@ -37,7 +37,7 @@ def cli() -> None:
 )
 @click.option("--format", "fmt", default="both", type=click.Choice(["json", "csv", "both"]), show_default=True)
 @click.option("--output", default="./ghosttype_report", show_default=True, help="Output directory")
-@click.option("--no-redact", is_flag=True, default=False, help="Show plaintext secret values in output files")
+@click.option("--redact", is_flag=True, default=False, help="Redact secret values in output files")
 @click.option("--context-window", default=200, show_default=True, help="Context characters around each match")
 @click.option("--copy-sources", is_flag=True, default=False, help="Copy source conversation files to output dir (may contain sensitive content)")
 @click.option(
@@ -51,7 +51,7 @@ def scan(
     tool: str | None,
     fmt: str,
     output: str,
-    no_redact: bool,
+    redact: bool,
     context_window: int,
     copy_sources: bool,
     min_confidence: str,
@@ -76,9 +76,9 @@ def scan(
 
     if findings:
         if fmt in ("json", "both"):
-            write_json(findings, out_dir / "findings.json", redact=not no_redact)
+            write_json(findings, out_dir / "findings.json", redact=redact)
         if fmt in ("csv", "both"):
-            write_csv(findings, out_dir / "findings.csv", redact=not no_redact)
+            write_csv(findings, out_dir / "findings.csv", redact=redact)
         if copy_sources:
             copy_sources_fn(findings, out_dir / "sources")
             console.print(f"[dim]Source files copied to {out_dir / 'sources'}[/dim]")
