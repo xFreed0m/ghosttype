@@ -1,0 +1,30 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Output - never commit scan results
+ghosttype_report/
+*.findings.json
+*.findings.csv
+
+# macOS
+.DS_Store
+*.swp
+
+# Secrets / credentials (just in case)
+.env
+*.key
+*.pem
+auth.json
+
+# Editor
+.idea/
+.vscode/
+*.code-workspace
