@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ghosttype.models import ConversationRecord, TextChunk
 from ghosttype.scanners.base import Scanner
+
+logger = logging.getLogger(__name__)
 
 _KEYCHAIN_SERVICES = [
     "ChatGPT Safe Storage",
@@ -87,6 +90,7 @@ class ChatGPTScanner(Scanner):
             plaintext_bytes = unpadder.update(padded) + unpadder.finalize()
             return plaintext_bytes.decode("utf-8", errors="replace")
         except (ValueError, KeyError, UnicodeDecodeError, TypeError):
+            logger.debug("Decryption failed for %s", path, exc_info=True)
             return None
 
     def extract_text(self, record: ConversationRecord) -> list[TextChunk]:

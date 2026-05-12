@@ -12,12 +12,14 @@ from ghosttype.scanner import Orchestrator
 
 console = Console()
 
-_BANNER = """
-   .--.        [bold cyan]ghosttype[/bold cyan] [dim]v0.1.0[/dim]
- .(    ).
-(_      _)     [dim]credential scanner for AI tool conversations[/dim]
-(  `~~~~'  )
-`----------'   [dim red]authorized use only[/dim red]
+_BANNER = r"""
+    .---.                   _               _   _
+   ( ^ ^ )   __ _  ___     | |_  _  _ _ __| |_| |_  _ _ __  ___
+    \ ~ /   / _` |/ _ \    |  _|| || | '_ \  _|  _|| || | '_ \/ -_)
+   (_)-(_)  \__, |\___/    |_|   \_,_| .__/\__|\___|\_,_| .__/\___|
+    /   \   |___/                     |_|                |_|
+   [_____]
+   |_|_|_|
 """
 
 
@@ -106,7 +108,11 @@ def list_tools() -> None:
 
 
 def _print_banner() -> None:
-    console.print(_BANNER)
+    console.print(_BANNER, highlight=False)
+    console.print(
+        "  [dim]credential scanner for AI tool conversation history[/dim]"
+        "  [dim red]authorized use only[/dim red]  [dim]v0.1.0[/dim]\n"
+    )
 
 
 def _print_summary(findings: list[Finding]) -> None:

@@ -35,7 +35,7 @@ class Orchestrator:
             except Exception:
                 logger.warning("Scanner %s failed during discover", scanner.name, exc_info=True)
                 continue
-            self.files_scanned += len(records)
+            self.files_scanned += len({r.source_path for r in records})
             for record in records:
                 try:
                     chunks = scanner.extract_text(record)
