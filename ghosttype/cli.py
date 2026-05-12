@@ -19,13 +19,33 @@ def cli() -> None:
 
 
 @cli.command()
-@click.option("--tool", default=None, help="Scan only this tool (cursor, chatgpt, codex, claude, claude_code)")
+@click.option(
+    "--tool",
+    default=None,
+    type=click.Choice(["cursor", "chatgpt", "codex", "claude", "claude_code"]),
+    help="Scan only this tool",
+)
 @click.option("--format", "fmt", default="both", type=click.Choice(["json", "csv", "both"]), show_default=True)
 @click.option("--output", default="./ghosttype_report", show_default=True, help="Output directory")
 @click.option("--no-redact", is_flag=True, default=False, help="Show plaintext secret values in output files")
 @click.option("--context-window", default=200, show_default=True, help="Context characters around each match")
 @click.option("--copy-sources", is_flag=True, default=False, help="Copy source conversation files to output dir (may contain sensitive content)")
-def scan(tool: str | None, fmt: str, output: str, no_redact: bool, context_window: int, copy_sources: bool) -> None:
+@click.option(
+    "--min-confidence",
+    default="medium",
+    type=click.Choice(["high", "medium"]),
+    show_default=True,
+    help="Minimum confidence level to include (high filters out heuristic matches)",
+)
+def scan(
+    tool: str | None,
+    fmt: str,
+    output: str,
+    no_redact: bool,
+    context_window: int,
+    copy_sources: bool,
+    min_confidence: str,
+) -> None:
     """Scan AI tool conversation files for credentials and secrets."""
     out_dir = Path(output)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -34,20 +54,25 @@ def scan(tool: str | None, fmt: str, output: str, no_redact: bool, context_windo
 
     orch = Orchestrator(context_window=context_window)
     findings = orch.run(tool_filter=tool)
+    if min_confidence == "high":
+        findings = [f for f in findings if f.confidence == "high"]
 
+    console.print(f"[dim]Scanned {orch.files_scanned} conversation file(s)[/dim]")
     if not findings:
         console.print("[yellow]No findings.[/yellow]")
     else:
         console.print(f"[green]{len(findings)} finding(s) discovered.[/green]")
 
-    if fmt in ("json", "both"):
-        write_json(findings, out_dir / "findings.json", redact=not no_redact)
-    if fmt in ("csv", "both"):
-        write_csv(findings, out_dir / "findings.csv", redact=not no_redact)
-
-    if findings and copy_sources:
-        copy_sources_fn(findings, out_dir / "sources")
-        console.print(f"[dim]Source files copied to {out_dir / 'sources'}[/dim]")
+    if findings:
+        if fmt in ("json", "both"):
+            write_json(findings, out_dir / "findings.json", redact=not no_redact)
+        if fmt in ("csv", "both"):
+            write_csv(findings, out_dir / "findings.csv", redact=not no_redact)
+        if copy_sources:
+            copy_sources_fn(findings, out_dir / "sources")
+            console.print(f"[dim]Source files copied to {out_dir / 'sources'}[/dim]")
+    else:
+        console.print("[dim]No output files written.[/dim]")
 
     _print_summary(findings)
 

@@ -17,6 +17,7 @@ def test_scan_command_creates_output_dir(tmp_path, monkeypatch):
     runner = CliRunner()
     with patch("ghosttype.cli.Orchestrator") as MockOrch:
         MockOrch.return_value.run.return_value = []
+        MockOrch.return_value.files_scanned = 0
         result = runner.invoke(cli, ["scan", "--output", str(tmp_path / "report")])
     assert result.exit_code == 0
     assert (tmp_path / "report").exists()
@@ -37,6 +38,7 @@ def test_scan_writes_json_by_default(tmp_path, monkeypatch):
     )
     with patch("ghosttype.cli.Orchestrator") as MockOrch:
         MockOrch.return_value.run.return_value = [fake_finding]
+        MockOrch.return_value.files_scanned = 1
         result = runner.invoke(cli, ["scan", "--output", str(tmp_path / "report")])
     assert result.exit_code == 0
     assert (tmp_path / "report" / "findings.json").exists()
@@ -48,15 +50,27 @@ def test_scan_tool_filter(tmp_path):
     runner = CliRunner()
     with patch("ghosttype.cli.Orchestrator") as MockOrch:
         MockOrch.return_value.run.return_value = []
+        MockOrch.return_value.files_scanned = 0
         runner.invoke(cli, ["scan", "--tool", "cursor", "--output", str(tmp_path / "r")])
         MockOrch.return_value.run.assert_called_once_with(tool_filter="cursor")
 
 
 def test_scan_format_json_only(tmp_path):
+    from datetime import datetime, timezone
+    from ghosttype.models import Finding
     from unittest.mock import patch
     runner = CliRunner()
+    fake_finding = Finding(
+        tool="cursor", secret_type="aws_access_key",
+        secret_value="AKIAIOSFODNN7EXAMPLE",
+        file_path=tmp_path / "session.db",
+        position="line:1:0", confidence="high",
+        context="key = AKIAIOSFODNN7EXAMPLE",
+        discovered_at=datetime.now(timezone.utc),
+    )
     with patch("ghosttype.cli.Orchestrator") as MockOrch:
-        MockOrch.return_value.run.return_value = []
+        MockOrch.return_value.run.return_value = [fake_finding]
+        MockOrch.return_value.files_scanned = 1
         runner.invoke(cli, ["scan", "--format", "json", "--output", str(tmp_path / "r")])
     # csv should NOT exist, json should
     assert (tmp_path / "r" / "findings.json").exists()

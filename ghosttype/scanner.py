@@ -18,10 +18,12 @@ class Orchestrator:
         else:
             self._scanners = scanners
         self._context_window = context_window
+        self.files_scanned: int = 0
 
     def run(self, tool_filter: str | None = None) -> list[Finding]:
         findings: list[Finding] = []
         seen: set[tuple[str, str, str]] = set()
+        self.files_scanned = 0
 
         for scanner in self._scanners:
             if tool_filter and scanner.name != tool_filter:
@@ -33,6 +35,7 @@ class Orchestrator:
             except Exception:
                 logger.warning("Scanner %s failed during discover", scanner.name, exc_info=True)
                 continue
+            self.files_scanned += len(records)
             for record in records:
                 try:
                     chunks = scanner.extract_text(record)
