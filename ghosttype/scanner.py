@@ -9,6 +9,19 @@ from ghosttype.scanners.base import Scanner
 
 logger = logging.getLogger(__name__)
 
+_HIGH_SEVERITY_TYPES = frozenset({
+    "aws_access_key",
+    "anthropic_key",
+    "openai_token",
+    "github_pat_classic",
+    "github_pat_fine",
+    "github_app_token",
+    "stripe_secret_key",
+    "private_key_pem",
+    "vault_token",
+    "heuristic_aws_secret",
+})
+
 
 class Orchestrator:
     def __init__(self, scanners: list[Scanner] | None = None, context_window: int = 200) -> None:
@@ -50,6 +63,13 @@ class Orchestrator:
                         if dedup_key in seen:
                             continue
                         seen.add(dedup_key)
+                        severity = (
+                            "critical"
+                            if match.secret_type in _HIGH_SEVERITY_TYPES
+                            else "high"
+                            if match.confidence == "high"
+                            else "medium"
+                        )
                         findings.append(Finding(
                             tool=scanner.name,
                             secret_type=match.secret_type,
@@ -59,5 +79,7 @@ class Orchestrator:
                             confidence=match.confidence,
                             context=match.context,
                             discovered_at=datetime.now(timezone.utc),
+                            severity=severity,
                         ))
+        findings.sort(key=lambda f: (0 if f.confidence == "high" else 1, f.secret_type))
         return findings

@@ -29,18 +29,30 @@ class CursorScanner(Scanner):
     def is_available(self) -> bool:
         return self._db_path.exists()
 
-    def discover(self) -> list[ConversationRecord]:
-        """Return one ConversationRecord per composerData entry found."""
-        if not self.is_available():
+    def _workspace_dbs(self) -> list[Path]:
+        """Return all workspace state.vscdb paths under workspaceStorage."""
+        ws_root = (
+            Path.home()
+            / "Library"
+            / "Application Support"
+            / "Cursor"
+            / "User"
+            / "workspaceStorage"
+        )
+        if not ws_root.exists():
             return []
+        return list(ws_root.rglob("state.vscdb"))
+
+    def _query_db(self, db_path: Path) -> list[ConversationRecord]:
+        """Query a single Cursor SQLite DB and return ConversationRecords."""
         records: list[ConversationRecord] = []
         try:
-            with sqlite3.connect(f"file:{self._db_path}?mode=ro", uri=True) as conn:
+            with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as conn:
                 rows = conn.execute(
                     "SELECT key, value FROM cursorDiskKV WHERE key LIKE 'composerData:%'"
                 ).fetchall()
         except sqlite3.Error:
-            logger.warning("Failed to read cursor db %s", self._db_path, exc_info=True)
+            logger.warning("Failed to read cursor db %s", db_path, exc_info=True)
             return []
 
         for key, value in rows:
@@ -58,12 +70,26 @@ class CursorScanner(Scanner):
                 else None
             )
             records.append(ConversationRecord(
-                source_path=self._db_path,
+                source_path=db_path,
                 tool=self.name,
                 conversation_id=composer_id,
                 created_at=created_at,
                 raw={"key": key, "data": data},
             ))
+        return records
+
+    def discover(self) -> list[ConversationRecord]:
+        """Return one ConversationRecord per composerData entry found.
+
+        Scans the global storage DB and all workspace storage DBs.
+        """
+        if not self.is_available():
+            return []
+        records = self._query_db(self._db_path)
+
+        for ws_db in self._workspace_dbs():
+            records.extend(self._query_db(ws_db))
+
         return records
 
     def extract_text(self, record: ConversationRecord) -> list[TextChunk]:

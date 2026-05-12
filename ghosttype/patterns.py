@@ -53,6 +53,14 @@ _REGEX_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("npm_token", re.compile(r"\b(npm_[a-zA-Z0-9]{36,})\b")),
     # Telegram bot tokens
     ("telegram_bot_token", re.compile(r"\b([0-9]{8,10}:[A-Za-z0-9_-]{34,})\b")),
+    # Hugging Face tokens
+    ("huggingface_token", re.compile(r"\b(hf_[a-zA-Z0-9]{34,})\b")),
+    # DigitalOcean personal access tokens
+    ("digitalocean_token", re.compile(r"\b(dop_v1_[a-zA-Z0-9]{64})\b")),
+    # GitHub OAuth access tokens
+    ("github_oauth_token", re.compile(r"\b(gho_[a-zA-Z0-9]{36})\b")),
+    # GitHub refresh tokens
+    ("github_refresh_token", re.compile(r"\b(ghr_[a-zA-Z0-9]{76})\b")),
 ]
 
 # Layer 2: variable-name context signals (confidence: medium)
@@ -106,6 +114,13 @@ _HEURISTIC_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
             r"(?i)(?:AZURE_CLIENT_SECRET|client_secret|AZURE_STORAGE_KEY|storage_account_key|AccountKey)\s*[=:]\s*[\"']?([A-Za-z0-9+/]{32,}={0,2})[\"']?"
         ),
     ),
+    # Generic high-entropy API key/secret triggered by strong keyword context
+    (
+        "heuristic_generic_secret",
+        re.compile(
+            r"(?i)(?:api[_-]?(?:key|token|secret)|auth[_-]?(?:key|token)|private[_-]?token|access[_-]?key)\s*[=:]\s*[\"']?([a-zA-Z0-9+/=_-]{32,})[\"']?"
+        ),
+    ),
 ]
 
 # Placeholder patterns that indicate a fake or example credential value.
@@ -153,12 +168,24 @@ _KNOWN_EXAMPLE_VALUES: frozenset[str] = frozenset({
     "hunter2supersecretvalue",
     "hunter2",
     "correcthorsebatterystaple",
-    # JWT example from jwt.io
+    # JWT examples from jwt.io
     "SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9",
     # Generic doc examples
     "mysecretpassword123",
     "mysupersecretkey",
     "thisisasecret",
+    # Common tutorial values
+    "ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456789012",
+    "sk-abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJK12",
+    "sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+    "ghp_xYzAbCdEfGhIjKlMnOpQrStUvWxYz12345678",
+    "ghs_16C7e42F292c6912E7710c838347Ae178B4a",
+    "hvs.CvmS4c0DPTvHv5eJgXWMJg9rABC123xyz",
+    "lin_api_abcdefghijklmnopqrstuvwxyz1234567890ab12",
+    "dapi1234567890abcdef1234567890abcdef",
+    "npm_1234567890abcdefghijklmnopqrstuvwxyz",
+    "123456789:AABBccDDeeffGGhhIIjjKKllMMnnOOppQQrr",
 })
 
 
@@ -211,6 +238,8 @@ def scan_text(text: str, context_window: int = 200) -> list[PatternMatch]:
     for secret_type, pattern in _REGEX_PATTERNS:
         for m in pattern.finditer(text):
             value = m.group(1)
+            if value in _KNOWN_EXAMPLE_VALUES:
+                continue
             key = (secret_type, value)
             if key in seen:
                 continue
@@ -227,14 +256,15 @@ def scan_text(text: str, context_window: int = 200) -> list[PatternMatch]:
                 )
             )
 
-    # Collect high-confidence values for dedup across layers.
-    high_confidence_values: set[str] = {m.secret_value for m in matches}
+    # Tracks all captured values (regex + heuristic) to prevent cross-layer duplication.
+    # Updated as heuristics fire so later heuristics don't re-report the same value.
+    captured_values: set[str] = {m.secret_value for m in matches}
 
     for secret_type, pattern in _HEURISTIC_PATTERNS:
         for m in pattern.finditer(text):
             value = m.group(1)
-            # Skip if already captured by a high-confidence pattern.
-            if value in high_confidence_values:
+            # Skip if already captured by any earlier pattern (regex or heuristic).
+            if value in captured_values:
                 continue
             # Filter out placeholder/example values to reduce false positives.
             if _is_likely_placeholder(value):
@@ -243,6 +273,7 @@ def scan_text(text: str, context_window: int = 200) -> list[PatternMatch]:
             if key in seen:
                 continue
             seen.add(key)
+            captured_values.add(value)  # mark so subsequent heuristics skip this value
             matches.append(
                 PatternMatch(
                     secret_type=secret_type,
