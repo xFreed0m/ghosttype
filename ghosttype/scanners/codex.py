@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ghosttype.models import ConversationRecord, TextChunk
 from ghosttype.scanners.base import Scanner
+
+logger = logging.getLogger(__name__)
 
 
 class CodexScanner(Scanner):
@@ -95,6 +98,6 @@ class CodexScanner(Scanner):
                             record=record,
                         ))
             except sqlite3.Error:
-                pass
+                logger.warning("Failed to read logs db %s", logs_db, exc_info=True)
 
         return chunks

@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 
-from ghosttype.models import Finding, PatternMatch, TextChunk
+from ghosttype.models import Finding
 from ghosttype.patterns import scan_text
 from ghosttype.scanners.base import Scanner
+
+logger = logging.getLogger(__name__)
 
 
 class Orchestrator:
@@ -18,15 +21,27 @@ class Orchestrator:
 
     def run(self, tool_filter: str | None = None) -> list[Finding]:
         findings: list[Finding] = []
-        seen: set[tuple[str, str, str]] = set()  # (secret_value, file_path, secret_type)
+        seen: set[tuple[str, str, str]] = set()
 
         for scanner in self._scanners:
             if tool_filter and scanner.name != tool_filter:
                 continue
             if not scanner.is_available():
                 continue
-            for record in scanner.discover():
-                for chunk in scanner.extract_text(record):
+            try:
+                records = scanner.discover()
+            except Exception:
+                logger.warning("Scanner %s failed during discover", scanner.name, exc_info=True)
+                continue
+            for record in records:
+                try:
+                    chunks = scanner.extract_text(record)
+                except Exception:
+                    logger.warning(
+                        "Scanner %s failed extracting %s", scanner.name, record.source_path, exc_info=True
+                    )
+                    continue
+                for chunk in chunks:
                     for match in scan_text(chunk.text, self._context_window):
                         dedup_key = (match.secret_value, str(record.source_path), match.secret_type)
                         if dedup_key in seen:

@@ -1,11 +1,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ghosttype.models import ConversationRecord, TextChunk
 from ghosttype.scanners.base import Scanner
+
+logger = logging.getLogger(__name__)
 
 _CONTENT_TYPES = {"user", "assistant"}
 
@@ -89,5 +92,5 @@ class ClaudeCodeScanner(Scanner):
                             )
                         )
         except OSError:
-            pass
+            logger.warning("Failed to read %s", record.source_path, exc_info=True)
         return chunks

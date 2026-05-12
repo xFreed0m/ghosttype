@@ -42,16 +42,16 @@ def _finding_to_dict(f: Finding, redact: bool = False) -> dict:
     }
 
 
-def write_json(findings: list[Finding], path: Path, redact: bool = False) -> None:
+def write_json(findings: list[Finding], path: Path, redact: bool = True) -> None:
     """Write findings to a JSON file.
 
     Creates parent directories if needed. By default, secret values are
-    written in plaintext; pass redact=True to replace them with a marker.
+    redacted; pass redact=False to include actual values.
 
     Args:
         findings: List of Finding objects.
         path: Output file path.
-        redact: If True, replace secret_value with "***REDACTED***".
+        redact: If True (default), replace secret_value with "***REDACTED***".
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(

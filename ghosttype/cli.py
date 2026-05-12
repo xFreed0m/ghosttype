@@ -6,7 +6,8 @@ import click
 from rich.console import Console
 from rich.table import Table
 
-from ghosttype.report import copy_sources, write_csv, write_json
+from ghosttype.models import Finding
+from ghosttype.report import copy_sources as copy_sources_fn, write_csv, write_json
 from ghosttype.scanner import Orchestrator
 
 console = Console()
@@ -21,9 +22,10 @@ def cli() -> None:
 @click.option("--tool", default=None, help="Scan only this tool (cursor, chatgpt, codex, claude, claude_code)")
 @click.option("--format", "fmt", default="both", type=click.Choice(["json", "csv", "both"]), show_default=True)
 @click.option("--output", default="./ghosttype_report", show_default=True, help="Output directory")
-@click.option("--no-redact", is_flag=True, default=False, help="Show plaintext secret values in CSV")
+@click.option("--no-redact", is_flag=True, default=False, help="Show plaintext secret values in output files")
 @click.option("--context-window", default=200, show_default=True, help="Context characters around each match")
-def scan(tool: str | None, fmt: str, output: str, no_redact: bool, context_window: int) -> None:
+@click.option("--copy-sources", is_flag=True, default=False, help="Copy source conversation files to output dir (may contain sensitive content)")
+def scan(tool: str | None, fmt: str, output: str, no_redact: bool, context_window: int, copy_sources: bool) -> None:
     """Scan AI tool conversation files for credentials and secrets."""
     out_dir = Path(output)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -43,8 +45,9 @@ def scan(tool: str | None, fmt: str, output: str, no_redact: bool, context_windo
     if fmt in ("csv", "both"):
         write_csv(findings, out_dir / "findings.csv", redact=not no_redact)
 
-    if findings:
-        copy_sources(findings, out_dir / "sources")
+    if findings and copy_sources:
+        copy_sources_fn(findings, out_dir / "sources")
+        console.print(f"[dim]Source files copied to {out_dir / 'sources'}[/dim]")
 
     _print_summary(findings)
 
@@ -67,7 +70,7 @@ def list_tools() -> None:
     console.print(table)
 
 
-def _print_summary(findings: list) -> None:
+def _print_summary(findings: list[Finding]) -> None:
     if not findings:
         return
     table = Table(title="Findings Summary", show_header=True)

@@ -31,7 +31,7 @@ def findings(tmp_path):
 
 def test_write_json_creates_valid_file(tmp_path, findings):
     out = tmp_path / "findings.json"
-    write_json(findings, out)
+    write_json(findings, out, redact=False)
     data = json.loads(out.read_text())
     assert len(data) == 1
     assert data[0]["secret_value"] == "AKIAIOSFODNN7EXAMPLE"

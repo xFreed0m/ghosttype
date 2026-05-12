@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import json
+import logging
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
 from ghosttype.models import ConversationRecord, TextChunk
 from ghosttype.scanners.base import Scanner
+
+logger = logging.getLogger(__name__)
 
 
 class CursorScanner(Scanner):
@@ -37,6 +40,7 @@ class CursorScanner(Scanner):
                     "SELECT key, value FROM cursorDiskKV WHERE key LIKE 'composerData:%'"
                 ).fetchall()
         except sqlite3.Error:
+            logger.warning("Failed to read cursor db %s", self._db_path, exc_info=True)
             return []
 
         for key, value in rows:

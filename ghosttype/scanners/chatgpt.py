@@ -53,34 +53,39 @@ class ChatGPTScanner(Scanner):
         return None
 
     def _decrypt(self, path: Path) -> str | None:
-        """Attempt AES-256-GCM decryption of a ChatGPT .data file.
+        """Attempt AES-128-CBC decryption of a ChatGPT .data file.
 
-        Returns decrypted string on success, None on failure.
-        Electron safeStorage on macOS: data is prefixed with b'v10' or b'v11',
-        followed by AES-256-GCM ciphertext. Key is from Keychain via PBKDF2.
+        Electron safeStorage on macOS uses Chrome OSCrypt: AES-128-CBC, key from
+        Keychain via PBKDF2-HMAC-SHA1(salt=b'saltysalt', iterations=1003, dklen=16),
+        IV = 16 space bytes, data prefixed with b'v10' or b'v11'.
         """
-        raw = path.read_bytes()
         key_bytes = self._get_keychain_key()
         if not key_bytes:
             return None
 
-        # Chrome/Electron v10 prefix on macOS
+        try:
+            raw = path.read_bytes()
+        except OSError:
+            return None
+
         prefix = raw[:3]
         if prefix not in (b"v10", b"v11"):
             return None
 
         try:
             from hashlib import pbkdf2_hmac
-            from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+            from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+            from cryptography.hazmat.primitives import padding as sym_padding
 
-            # Derive 256-bit key: PBKDF2-HMAC-SHA1, salt=b'saltysalt', iterations=1003
-            key = pbkdf2_hmac("sha1", key_bytes, b"saltysalt", 1003, dklen=32)
-            # iv: 16 space bytes (Electron standard)
+            key = pbkdf2_hmac("sha1", key_bytes, b"saltysalt", 1003, dklen=16)
             iv = b" " * 16
             ciphertext = raw[3:]
-            aesgcm = AESGCM(key)
-            plaintext = aesgcm.decrypt(iv, ciphertext, None)
-            return plaintext.decode("utf-8", errors="replace")
+            cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+            decryptor = cipher.decryptor()
+            padded = decryptor.update(ciphertext) + decryptor.finalize()
+            unpadder = sym_padding.PKCS7(128).unpadder()
+            plaintext_bytes = unpadder.update(padded) + unpadder.finalize()
+            return plaintext_bytes.decode("utf-8", errors="replace")
         except (ValueError, KeyError, UnicodeDecodeError, TypeError):
             return None
 

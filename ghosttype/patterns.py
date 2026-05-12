@@ -46,12 +46,7 @@ _HEURISTIC_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
             r"(?i)(?:password|passwd|pwd)\s*[=:]\s*[\"']?([^\s\"']{6,})"
         ),
     ),
-    (
-        "heuristic_secret_key",
-        re.compile(
-            r"(?i)(?:secret[_\-]?key|secret)\s*[=:]\s*[\"']?([^\s\"']{8,})"
-        ),
-    ),
+    ("heuristic_secret_key", re.compile(r'(?i)(?:secret[_\-]?key)\s*[=:]\s*["\']?([^\s"\']{8,})')),
     (
         "heuristic_token",
         re.compile(
@@ -76,9 +71,11 @@ def _extract_context(text: str, start: int, end: int, window: int) -> str:
 
 
 def scan_text(text: str, context_window: int = 200) -> list[PatternMatch]:
-    """Scan *text* for credential patterns.
+    """Scan text for credential patterns. Returns deduplicated PatternMatch list.
 
-    Returns a deduplicated list of PatternMatch objects ordered by char_offset.
+    context_window controls the number of surrounding characters captured.
+    For matches longer than context_window, the returned context will be larger.
+
     Two detection layers are applied:
     - Regex patterns (confidence: "high") for known credential formats.
     - Heuristic patterns (confidence: "medium") for variable-name context signals.
