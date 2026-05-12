@@ -74,3 +74,57 @@ def test_no_false_positive_on_clean_text():
     text = "Hello world, this is a normal conversation about coding."
     matches = scan_text(text)
     assert matches == []
+
+
+def test_detects_github_app_token():
+    text = "token = ghs_16C7e42F292c6912E7710c838347Ae178B4a"
+    matches = scan_text(text)
+    assert any(m.secret_type == "github_app_token" for m in matches)
+
+
+def test_detects_github_user_token():
+    text = "GH_USER_TOKEN=ghu_16C7e42F292c6912E7710c838347Ae178B4a"
+    matches = scan_text(text)
+    assert any(m.secret_type == "github_user_token" for m in matches)
+
+
+def test_detects_vault_token():
+    text = "VAULT_TOKEN=hvs.CvmS4c0DPTvHv5eJgXWMJg9rABC123xyz"
+    matches = scan_text(text)
+    assert any(m.secret_type == "vault_token" for m in matches)
+
+
+def test_detects_vault_batch_token():
+    text = "hvb.1234567890abcdefghijklmn"
+    matches = scan_text(text)
+    assert any(m.secret_type == "vault_token" for m in matches)
+
+
+def test_detects_linear_key():
+    text = "LINEAR_API_KEY=lin_api_abcdefghijklmnopqrstuvwxyz1234567890ab12"
+    matches = scan_text(text)
+    assert any(m.secret_type == "linear_api_key" for m in matches)
+
+
+def test_detects_databricks_token():
+    text = "DATABRICKS_TOKEN=dapi1234567890abcdef1234567890abcdef"
+    matches = scan_text(text)
+    assert any(m.secret_type == "databricks_token" for m in matches)
+
+
+def test_detects_npm_token():
+    text = "NPM_TOKEN=npm_1234567890abcdefghijklmnopqrstuvwxyz"
+    matches = scan_text(text)
+    assert any(m.secret_type == "npm_token" for m in matches)
+
+
+def test_detects_telegram_bot():
+    text = "BOT_TOKEN=123456789:AABBccDDeeffGGhhIIjjKKllMMnnOOppQQrr"
+    matches = scan_text(text)
+    assert any(m.secret_type == "telegram_bot_token" for m in matches)
+
+
+def test_heuristic_detects_azure_secret():
+    text = "AZURE_CLIENT_SECRET='abcdefghijklmnopqrstuvwxyz123456='"
+    matches = scan_text(text)
+    assert any(m.secret_type == "heuristic_azure_secret" for m in matches)

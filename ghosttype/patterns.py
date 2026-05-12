@@ -40,6 +40,19 @@ _REGEX_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("slack_token", re.compile(r"\b(xox[bpas]-[0-9a-zA-Z\-]{10,})\b")),
     # SendGrid
     ("sendgrid_key", re.compile(r"\b(SG\.[a-zA-Z0-9\-_]{20,}\.[a-zA-Z0-9\-_]{20,})\b")),
+    # GitHub App tokens (server-to-server, user-to-server)
+    ("github_app_token", re.compile(r"\b(ghs_[a-zA-Z0-9]{36})\b")),
+    ("github_user_token", re.compile(r"\b(ghu_[a-zA-Z0-9]{36})\b")),
+    # HashiCorp Vault tokens (service, batch, recovery)
+    ("vault_token", re.compile(r"\b(hv[sbr]\.[a-zA-Z0-9]{24,})\b")),
+    # Linear API keys
+    ("linear_api_key", re.compile(r"\b(lin_api_[a-zA-Z0-9]{40})\b")),
+    # Databricks personal access tokens
+    ("databricks_token", re.compile(r"\b(dapi[a-zA-Z0-9]{32})\b")),
+    # npm automation tokens
+    ("npm_token", re.compile(r"\b(npm_[a-zA-Z0-9]{36,})\b")),
+    # Telegram bot tokens
+    ("telegram_bot_token", re.compile(r"\b([0-9]{8,10}:[A-Za-z0-9_-]{34,})\b")),
 ]
 
 # Layer 2: variable-name context signals (confidence: medium)
@@ -86,20 +99,36 @@ _HEURISTIC_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
             r"(?i)(?:JWT_SECRET|jwt_secret|SIGNING_KEY|signing_key|TOKEN_SECRET|token_secret)\s*[=:]\s*[\"']?([^\s\"']{8,})"
         ),
     ),
+    # Azure storage/AD credentials (high-entropy base64 with keyword context)
+    (
+        "heuristic_azure_secret",
+        re.compile(
+            r"(?i)(?:AZURE_CLIENT_SECRET|client_secret|AZURE_STORAGE_KEY|storage_account_key|AccountKey)\s*[=:]\s*[\"']?([A-Za-z0-9+/]{32,}={0,2})[\"']?"
+        ),
+    ),
 ]
 
 # Placeholder patterns that indicate a fake or example credential value.
-_PLACEHOLDER_PATTERNS = _re.compile(
-    r"^(?:your[-_]?(?:key|token|secret|api[-_]?key)|"
-    r"example|test|demo|placeholder|changeme|"
-    r"<[^>]+>|</[^>]+>|"  # HTML tags
-    r"xxx+|yyy+|aaa+|000+|"  # repeated chars
-    r"insert[-_]?here|replace[-_]?me|"
-    r"my[-_]?(?:key|token|secret|password)|"
-    r"secret[-_]?here|key[-_]?here|"
-    r"user[-_]?password|user[-_]?secret|user[-_]?token|"  # code-example variable names
+# Anchored at start — these stems indicate a placeholder prefix regardless of suffix.
+_PLACEHOLDER_STEMS = _re.compile(
+    r"^(?:your[-_]?(?:key|token|secret|api[-_]?key|password|credential)|"
+    r"insert[-_]?(?:key|token|secret|password)|"
+    r"replace[-_]?(?:with|me|this)|"
+    r"<[^>]+>|</[^>]+>)",              # HTML tags
+    _re.IGNORECASE,
+)
+
+# Exact-match known placeholder strings (full string must match)
+_PLACEHOLDER_EXACT = _re.compile(
+    r"^(?:example|test|demo|placeholder|changeme|"
+    r"xxx+|yyy+|aaa+|000+|none|null|undefined|"
+    r"my[-_]?(?:key|token|secret|password|api[-_]?key)|"
+    r"secret[-_]?here|key[-_]?here|token[-_]?here|password[-_]?here|"
     r"some[-_]?(?:password|secret|token|key)|"
-    r"actual[-_]?(?:password|secret|token|key))$",
+    r"actual[-_]?(?:password|secret|token|key)|"
+    r"user[-_]?(?:password|secret|token)|"
+    r"fake[-_]?(?:key|token|secret)|"
+    r"sample[-_]?(?:key|token|secret))$",
     _re.IGNORECASE,
 )
 
@@ -118,15 +147,20 @@ def _is_likely_placeholder(value: str) -> bool:
     """Return True if the value looks like a placeholder, not a real credential."""
     if len(value) < 8:
         return True
-    if _PLACEHOLDER_PATTERNS.match(value):
+    if _PLACEHOLDER_STEMS.match(value):
         return True
-    # Real passwords/keys have entropy > 2.0 bits/char.
-    if _shannon_entropy(value) < 2.0:
+    if _PLACEHOLDER_EXACT.match(value):
         return True
     # HTML-like content
     if value.startswith("<") or value.startswith("</"):
         return True
     if value.endswith(">") or value.endswith("/>"):
+        return True
+    # Common placeholder suffixes (your-key-here, insert-token-here, etc.)
+    if _re.search(r'[-_](?:here|there|goes|value|placeholder|example|token|key|secret)$', value, _re.IGNORECASE):
+        return True
+    # Real credentials have entropy > 3.0 bits/char (industry standard from gitleaks/detect-secrets)
+    if _shannon_entropy(value) < 3.0:
         return True
     return False
 
