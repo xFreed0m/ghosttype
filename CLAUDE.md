@@ -38,9 +38,17 @@ See ARCHITECTURE.md for full detail and data flow.
 
 ## Current state
 
-- Project initialized, design complete
-- No code written yet (implementation starts after this session)
-- See ROADMAP.md for v1 scope
+v1.0 shipped. v2 improvements merged. Active development on v3 improvements.
+
+**Pattern coverage (30+ types):** AWS keys, OpenAI (sk-, sk-proj-), Anthropic, GitHub (ghp_, ghs_, ghu_), Stripe, Slack, HashiCorp Vault, Linear, Databricks, npm, SendGrid, Telegram, Hugging Face, DigitalOcean, GCP service accounts, JWT, PEM keys, connection strings, Azure (heuristic), AWS secret key (heuristic), JWT secrets (heuristic).
+
+**FP reduction:** entropy threshold 3.0 bits/char, placeholder stem/suffix filters, known-example exclusion set.
+
+**CLI flags:** `--tool`, `--format`, `--output`, `--min-confidence`, `--redact`, `--copy-sources`, `--allow-list`, `--stats-only`, `--context-window`.
+
+**Finding fields:** tool, secret_type, severity, secret_value, file_path, position, confidence, context, discovered_at.
+
+See ROADMAP.md for current v2 checklist and v3 scope.
 
 ## Development conventions
 

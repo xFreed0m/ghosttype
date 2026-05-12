@@ -58,3 +58,38 @@
 - Memory extraction (Codex memories, Claude memory files)
 - Pattern false-positive reduction (entropy scoring, context window expansion)
 - `--watch` mode for continuous monitoring
+
+---
+
+## v2.0 - Pattern Expansion (MERGED)
+
+- [x] 14 new credential patterns (Stripe, Slack, SendGrid, GitHub App/User, Vault, Linear, Databricks, npm, Telegram, Azure heuristic)
+- [x] AWS Secret Access Key heuristic (variable-name context)
+- [x] JWT signing secret heuristic
+- [x] Entropy-based FP filtering (3.0 bits/char threshold, industry standard)
+- [x] Known-example exclusion list (AWS doc keys, jwt.io examples)
+- [x] Placeholder stem/suffix pattern filters
+- [x] Unredacted output by default; `--redact` flag for safe sharing
+- [x] `--min-confidence` filter (high/medium)
+- [x] `files_scanned` counter in CLI output
+- [x] Skip empty output files when no findings
+- [x] Realistic test fixtures (5 JSONL scenarios + Cursor SQLite)
+- [x] 66 tests
+
+---
+
+## v3.0 - Coverage Expansion (in progress)
+
+### Scope
+
+- [ ] Apply known-example filter to regex matches (AKIAIOSFODNN7EXAMPLE etc.)
+- [ ] `severity` field on Finding (critical/high/medium)
+- [ ] Sort findings: high severity first, then by type
+- [ ] Claude Code: scan history.jsonl (command history with credential args)
+- [ ] Cursor: scan workspaceStorage/*.vscdb (not just globalStorage)
+- [ ] More token patterns: Hugging Face, DigitalOcean, GitHub OAuth/Refresh
+- [ ] `ghosttype version` command
+- [ ] Rich summary breakdown (by type + by tool)
+- [ ] `--allow-list` file for suppressing reviewed FPs
+- [ ] `--stats-only` flag
+

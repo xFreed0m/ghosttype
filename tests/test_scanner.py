@@ -20,7 +20,7 @@ def mock_scanner(tmp_path):
         raw={},
     )
     chunk = TextChunk(
-        text="AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE",
+        text="AWS_ACCESS_KEY_ID=AKIAY3MZRNQP4TK89WVX",
         position="line:1",
         record=rec,
     )
@@ -38,7 +38,7 @@ def test_orchestrator_runs_available_scanners(mock_scanner):
     assert len(findings) >= 1
     assert findings[0].tool == "fake_tool"
     assert findings[0].secret_type == "aws_access_key"
-    assert findings[0].secret_value == "AKIAIOSFODNN7EXAMPLE"
+    assert findings[0].secret_value == "AKIAY3MZRNQP4TK89WVX"
     assert findings[0].confidence == "high"
 
 
@@ -54,12 +54,12 @@ def test_orchestrator_deduplicates_same_secret_same_file(mock_scanner, tmp_path)
     src.write_text("x\n")
     rec = ConversationRecord(source_path=src, tool="fake_tool", conversation_id="c1",
                              created_at=datetime.now(timezone.utc), raw={})
-    chunk1 = TextChunk(text="key=AKIAIOSFODNN7EXAMPLE", position="line:1", record=rec)
-    chunk2 = TextChunk(text="key=AKIAIOSFODNN7EXAMPLE", position="line:2", record=rec)
+    chunk1 = TextChunk(text="key=AKIAY3MZRNQP4TK89WVX", position="line:1", record=rec)
+    chunk2 = TextChunk(text="key=AKIAY3MZRNQP4TK89WVX", position="line:2", record=rec)
     mock_scanner.extract_text.return_value = [chunk1, chunk2]
     orch = Orchestrator(scanners=[mock_scanner])
     findings = orch.run()
-    aws_findings = [f for f in findings if f.secret_value == "AKIAIOSFODNN7EXAMPLE"]
+    aws_findings = [f for f in findings if f.secret_value == "AKIAY3MZRNQP4TK89WVX"]
     assert len(aws_findings) == 1
 
 

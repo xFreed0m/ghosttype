@@ -68,3 +68,49 @@ def test_extract_text_position_includes_row_key(cursor_db, monkeypatch):
     records = s.discover()
     chunks = s.extract_text(records[0])
     assert all("composerData:" in c.position for c in chunks)
+
+
+def _make_vscdb(path: Path, composer_id: str, text: str) -> None:
+    """Helper: create a minimal state.vscdb at path."""
+    conn = sqlite3.connect(path)
+    conn.execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value TEXT)")
+    conn.execute(
+        "INSERT INTO cursorDiskKV (key, value) VALUES (?, ?)",
+        (f"composerData:{composer_id}", json.dumps({"composerId": composer_id, "text": text})),
+    )
+    conn.commit()
+    conn.close()
+
+
+def test_discover_also_scans_workspace_dbs(tmp_path, monkeypatch):
+    """Records from workspace storage DBs are included alongside the global DB."""
+    global_db = tmp_path / "state.vscdb"
+    _make_vscdb(global_db, "global-composer", "global text")
+
+    ws_dir = tmp_path / "workspaceStorage" / "abc123"
+    ws_dir.mkdir(parents=True)
+    ws_db = ws_dir / "state.vscdb"
+    _make_vscdb(ws_db, "workspace-composer", "workspace text with token")
+
+    monkeypatch.setattr(type(CursorScanner()), "_db_path", property(lambda self: global_db))
+
+    def fake_workspace_dbs(self):
+        return [ws_db]
+
+    monkeypatch.setattr(CursorScanner, "_workspace_dbs", fake_workspace_dbs)
+
+    s = CursorScanner()
+    records = s.discover()
+    ids = {r.conversation_id for r in records}
+    assert "global-composer" in ids
+    assert "workspace-composer" in ids
+
+
+def test_workspace_dbs_returns_empty_when_dir_missing(tmp_path):
+    """_workspace_dbs() returns [] gracefully when workspaceStorage does not exist."""
+    s = CursorScanner()
+    # Point home to tmp_path so the workspaceStorage path won't exist
+    import unittest.mock as mock
+    with mock.patch("pathlib.Path.home", return_value=tmp_path):
+        result = s._workspace_dbs()
+    assert result == []

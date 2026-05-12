@@ -41,3 +41,4 @@ class Finding:
     confidence: str
     context: str
     discovered_at: datetime
+    severity: str = "medium"

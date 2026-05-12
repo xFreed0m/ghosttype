@@ -11,6 +11,7 @@ from ghosttype.models import Finding
 _FIELDS = [
     "tool",
     "secret_type",
+    "severity",
     "secret_value",
     "file_path",
     "position",
@@ -33,6 +34,7 @@ def _finding_to_dict(f: Finding, redact: bool = False) -> dict:
     return {
         "tool": f.tool,
         "secret_type": f.secret_type,
+        "severity": f.severity,
         "secret_value": "***REDACTED***" if redact else f.secret_value,
         "file_path": str(f.file_path),
         "position": f.position,

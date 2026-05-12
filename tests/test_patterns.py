@@ -2,12 +2,12 @@ from ghosttype.patterns import scan_text
 
 
 def test_detects_aws_access_key():
-    text = "export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE"
+    text = "export AWS_ACCESS_KEY_ID=AKIAY3MZRNQP4TK89WVX"
     matches = scan_text(text)
     types = [m.secret_type for m in matches]
     assert "aws_access_key" in types
     found = next(m for m in matches if m.secret_type == "aws_access_key")
-    assert found.secret_value == "AKIAIOSFODNN7EXAMPLE"
+    assert found.secret_value == "AKIAY3MZRNQP4TK89WVX"
     assert found.confidence == "high"
 
 
@@ -19,13 +19,13 @@ def test_detects_openai_token():
 
 
 def test_detects_github_pat_classic():
-    text = "GITHUB_TOKEN=ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456789012"
+    text = "GITHUB_TOKEN=ghp_RpQs7vXzBnCkDmWjEtFuGhYi12345678901234"
     matches = scan_text(text)
     assert any(m.secret_type == "github_pat_classic" for m in matches)
 
 
 def test_detects_anthropic_key():
-    text = "key = 'sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'"
+    text = "key = 'sk-ant-api03-RpQs7vXzBnCkDmWjEtFuGhYiOpLmKnJqHrGs-TUVwxyz'"
     matches = scan_text(text)
     assert any(m.secret_type == "anthropic_key" for m in matches)
 
@@ -61,13 +61,14 @@ def test_heuristic_detects_password_assignment():
 
 
 def test_context_window_centered_on_match():
+    aws_key = "AKIAY3MZRNQP4TK89WVX"
     prefix = "x" * 50
     suffix = "y" * 50
-    text = f"{prefix}AKIAIOSFODNN7EXAMPLE{suffix}"
+    text = f"{prefix}{aws_key}{suffix}"
     matches = scan_text(text, context_window=40)
     found = next(m for m in matches if m.secret_type == "aws_access_key")
-    assert "AKIAIOSFODNN7EXAMPLE" in found.context
-    assert len(found.context) <= 40 + len("AKIAIOSFODNN7EXAMPLE")
+    assert aws_key in found.context
+    assert len(found.context) <= 40 + len(aws_key)
 
 
 def test_no_false_positive_on_clean_text():
@@ -76,8 +77,15 @@ def test_no_false_positive_on_clean_text():
     assert matches == []
 
 
+def test_known_example_aws_key_excluded():
+    """AKIAIOSFODNN7EXAMPLE is the AWS docs canonical key and must be suppressed."""
+    text = "export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE"
+    matches = scan_text(text)
+    assert not any(m.secret_type == "aws_access_key" for m in matches)
+
+
 def test_detects_github_app_token():
-    text = "token = ghs_16C7e42F292c6912E7710c838347Ae178B4a"
+    text = "token = ghs_RpQs7vXzBnCkDmWjEtFuGhYiOpLmKnJqHr12"
     matches = scan_text(text)
     assert any(m.secret_type == "github_app_token" for m in matches)
 
@@ -89,7 +97,7 @@ def test_detects_github_user_token():
 
 
 def test_detects_vault_token():
-    text = "VAULT_TOKEN=hvs.CvmS4c0DPTvHv5eJgXWMJg9rABC123xyz"
+    text = "VAULT_TOKEN=hvs.RpQs7vXzBnCkDmWjEtFuGhYiOpLmKnJqHrGs12"
     matches = scan_text(text)
     assert any(m.secret_type == "vault_token" for m in matches)
 
@@ -101,25 +109,25 @@ def test_detects_vault_batch_token():
 
 
 def test_detects_linear_key():
-    text = "LINEAR_API_KEY=lin_api_abcdefghijklmnopqrstuvwxyz1234567890ab12"
+    text = "LINEAR_API_KEY=lin_api_RpQs7vXzBnCkDmWjEtFuGhYiOpLmKnJqHrGs1234"
     matches = scan_text(text)
     assert any(m.secret_type == "linear_api_key" for m in matches)
 
 
 def test_detects_databricks_token():
-    text = "DATABRICKS_TOKEN=dapi1234567890abcdef1234567890abcdef"
+    text = "DATABRICKS_TOKEN=dapiRpQs7vXzBnCkDmWjEtFuGhYiOpLm1234"
     matches = scan_text(text)
     assert any(m.secret_type == "databricks_token" for m in matches)
 
 
 def test_detects_npm_token():
-    text = "NPM_TOKEN=npm_1234567890abcdefghijklmnopqrstuvwxyz"
+    text = "NPM_TOKEN=npm_RpQs7vXzBnCkDmWjEtFuGhYiOpLmKnJqHrGs12"
     matches = scan_text(text)
     assert any(m.secret_type == "npm_token" for m in matches)
 
 
 def test_detects_telegram_bot():
-    text = "BOT_TOKEN=123456789:AABBccDDeeffGGhhIIjjKKllMMnnOOppQQrr"
+    text = "BOT_TOKEN=987654321:ZZYYxxWWvvUUttSSrrQQppOOnnMMllKKjj12"
     matches = scan_text(text)
     assert any(m.secret_type == "telegram_bot_token" for m in matches)
 
@@ -128,3 +136,27 @@ def test_heuristic_detects_azure_secret():
     text = "AZURE_CLIENT_SECRET='abcdefghijklmnopqrstuvwxyz123456='"
     matches = scan_text(text)
     assert any(m.secret_type == "heuristic_azure_secret" for m in matches)
+
+
+def test_detects_huggingface_token():
+    text = "HF_TOKEN=hf_ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijkl"
+    matches = scan_text(text)
+    assert any(m.secret_type == "huggingface_token" for m in matches)
+
+
+def test_detects_digitalocean_token():
+    text = "DO_TOKEN=dop_v1_" + "a" * 64
+    matches = scan_text(text)
+    assert any(m.secret_type == "digitalocean_token" for m in matches)
+
+
+def test_detects_github_oauth_token():
+    text = "GH_OAUTH=gho_16C7e42F292c6912E7710c838347Ae178B4a"
+    matches = scan_text(text)
+    assert any(m.secret_type == "github_oauth_token" for m in matches)
+
+
+def test_detects_github_refresh_token():
+    text = "GH_REFRESH=ghr_" + "A" * 76
+    matches = scan_text(text)
+    assert any(m.secret_type == "github_refresh_token" for m in matches)
