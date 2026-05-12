@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from collections import Counter
 from pathlib import Path
 
@@ -58,6 +59,7 @@ def version() -> None:
 )
 @click.option("--allow-list", default=None, type=click.Path(exists=True), help="Path to file with known-safe values to suppress (one per line)")
 @click.option("--stats-only", is_flag=True, default=False, help="Print summary statistics only, not full findings table")
+@click.option("--quiet", "-q", is_flag=True, default=False, help="Suppress banner and progress messages (for scripting)")
 def scan(
     tool: str | None,
     fmt: str,
@@ -68,15 +70,24 @@ def scan(
     min_confidence: str,
     allow_list: str | None,
     stats_only: bool,
+    quiet: bool,
 ) -> None:
     """Scan AI tool conversation files for credentials and secrets."""
-    _print_banner()
+    if not quiet:
+        _print_banner()
     out_dir = Path(output)
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    console.print(f"[bold]ghosttype[/bold] scanning... output -> [cyan]{out_dir}[/cyan]")
+    if not quiet:
+        console.print(f"[bold]ghosttype[/bold] scanning... output -> [cyan]{out_dir}[/cyan]")
 
     orch = Orchestrator(context_window=context_window)
+
+    if not quiet:
+        from ghosttype.scanners import SCANNERS
+        active = [s for s in SCANNERS if (not tool or s.name == tool) and s.is_available()]
+        console.print(f"[dim]Scanning {len(active)} tool(s): {', '.join(s.name for s in active)}[/dim]")
+
     findings = orch.run(tool_filter=tool)
     if min_confidence == "high":
         findings = [f for f in findings if f.confidence == "high"]
@@ -92,14 +103,15 @@ def scan(
                     allowed.add(line)
         suppressed_count = len([f for f in findings if f.secret_value in allowed])
         findings = [f for f in findings if f.secret_value not in allowed]
-        if allowed:
+        if allowed and not quiet:
             console.print(f"[dim]Allow-list suppressed {suppressed_count} value(s)[/dim]")
 
-    console.print(f"[dim]Scanned {orch.files_scanned} conversation file(s)[/dim]")
-    if not findings:
-        console.print("[yellow]No findings.[/yellow]")
-    else:
-        console.print(f"[green]{len(findings)} finding(s) discovered.[/green]")
+    if not quiet:
+        console.print(f"[dim]Scanned {orch.files_scanned} conversation file(s)[/dim]")
+        if not findings:
+            console.print("[yellow]No findings.[/yellow]")
+        else:
+            console.print(f"[green]{len(findings)} finding(s) discovered.[/green]")
 
     if findings:
         if fmt in ("json", "both"):
@@ -108,14 +120,19 @@ def scan(
             write_csv(findings, out_dir / "findings.csv", redact=redact)
         if copy_sources:
             copy_sources_fn(findings, out_dir / "sources")
-            console.print(f"[dim]Source files copied to {out_dir / 'sources'}[/dim]")
+            if not quiet:
+                console.print(f"[dim]Source files copied to {out_dir / 'sources'}[/dim]")
     else:
-        console.print("[dim]No output files written.[/dim]")
+        if not quiet:
+            console.print("[dim]No output files written.[/dim]")
 
     if not stats_only:
         _print_summary(findings, orch.files_scanned)
     else:
         _print_stats_only(findings, orch.files_scanned)
+
+    if findings:
+        sys.exit(1)  # non-zero exit when credentials found - enables CI use
 
 
 @cli.command("list-tools")

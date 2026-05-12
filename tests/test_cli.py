@@ -40,7 +40,7 @@ def test_scan_writes_json_by_default(tmp_path, monkeypatch):
         MockOrch.return_value.run.return_value = [fake_finding]
         MockOrch.return_value.files_scanned = 1
         result = runner.invoke(cli, ["scan", "--output", str(tmp_path / "report")])
-    assert result.exit_code == 0
+    assert result.exit_code == 1  # non-zero when findings are present (CI/CD behavior)
     assert (tmp_path / "report" / "findings.json").exists()
     assert (tmp_path / "report" / "findings.csv").exists()
 
@@ -119,7 +119,7 @@ def test_scan_with_allow_list(tmp_path):
         MockOrch.return_value.files_scanned = 2
         result = runner.invoke(cli, ["scan", "--output", str(tmp_path / "report"), "--allow-list", str(allow_list_file)])
 
-    assert result.exit_code == 0
+    assert result.exit_code == 1  # non-zero when findings remain after suppression
     assert "Allow-list suppressed" in result.output
 
 
@@ -143,7 +143,7 @@ def test_scan_with_stats_only(tmp_path):
         MockOrch.return_value.files_scanned = 1
         result = runner.invoke(cli, ["scan", "--output", str(tmp_path / "report"), "--stats-only"])
 
-    assert result.exit_code == 0
+    assert result.exit_code == 1  # non-zero when findings are present (CI/CD behavior)
     # With --stats-only, we should see the stats breakdown (By Type, By Tool)
     assert "By Type" in result.output or "By Tool" in result.output
     # Should still have findings summary

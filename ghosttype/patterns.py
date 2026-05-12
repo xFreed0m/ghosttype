@@ -61,6 +61,10 @@ _REGEX_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("github_oauth_token", re.compile(r"\b(gho_[a-zA-Z0-9]{36})\b")),
     # GitHub refresh tokens
     ("github_refresh_token", re.compile(r"\b(ghr_[a-zA-Z0-9]{76})\b")),
+    # GCP API keys (browser/server keys)
+    ("gcp_api_key",         re.compile(r"\b(AIzaSy[a-zA-Z0-9_-]{33})\b")),
+    # AWS STS temporary tokens (ASIA prefix)
+    ("aws_sts_token",       re.compile(r"(?<![A-Z0-9])(ASIA[0-9A-Z]{16})(?![A-Z0-9])")),
 ]
 
 # Layer 2: variable-name context signals (confidence: medium)
@@ -164,6 +168,8 @@ _KNOWN_EXAMPLE_VALUES: frozenset[str] = frozenset({
     # AWS documentation canonical example credentials
     "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
     "AKIAIOSFODNN7EXAMPLE",
+    # AWS STS docs canonical example token prefix
+    "ASIAIOSFODNN7EXAMPLE",
     # Famous test passwords
     "hunter2supersecretvalue",
     "hunter2",

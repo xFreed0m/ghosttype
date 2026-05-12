@@ -160,3 +160,22 @@ def test_detects_github_refresh_token():
     text = "GH_REFRESH=ghr_" + "A" * 76
     matches = scan_text(text)
     assert any(m.secret_type == "github_refresh_token" for m in matches)
+
+
+def test_detects_gcp_api_key():
+    text = "MAPS_KEY=AIzaSyAbCdEfGhIjKlMnOpQrStUvWxYz1234567"
+    matches = scan_text(text)
+    assert any(m.secret_type == "gcp_api_key" for m in matches)
+
+
+def test_detects_aws_sts_token():
+    text = "AWS_ACCESS_KEY_ID=ASIAIOSFODNN7TESTKEY"
+    matches = scan_text(text)
+    assert any(m.secret_type == "aws_sts_token" for m in matches)
+
+
+def test_aws_sts_example_value_excluded():
+    """ASIAIOSFODNN7EXAMPLE is the AWS docs STS example and must be suppressed."""
+    text = "AWS_ACCESS_KEY_ID=ASIAIOSFODNN7EXAMPLE"
+    matches = scan_text(text)
+    assert not any(m.secret_type == "aws_sts_token" for m in matches)
