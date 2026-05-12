@@ -12,6 +12,14 @@ from ghosttype.scanner import Orchestrator
 
 console = Console()
 
+_BANNER = """
+   .--.        [bold cyan]ghosttype[/bold cyan] [dim]v0.1.0[/dim]
+ .(    ).
+(_      _)     [dim]credential scanner for AI tool conversations[/dim]
+(  `~~~~'  )
+`----------'   [dim red]authorized use only[/dim red]
+"""
+
 
 @click.group()
 def cli() -> None:
@@ -47,6 +55,7 @@ def scan(
     min_confidence: str,
 ) -> None:
     """Scan AI tool conversation files for credentials and secrets."""
+    _print_banner()
     out_dir = Path(output)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -80,6 +89,7 @@ def scan(
 @cli.command("list-tools")
 def list_tools() -> None:
     """Show which AI tools are detected on this machine."""
+    _print_banner()
     from ghosttype.scanners import SCANNERS
 
     table = Table(title="AI Tools", show_header=True)
@@ -93,6 +103,10 @@ def list_tools() -> None:
         table.add_row(scanner.name, scanner.display_name, status)
 
     console.print(table)
+
+
+def _print_banner() -> None:
+    console.print(_BANNER)
 
 
 def _print_summary(findings: list[Finding]) -> None:
