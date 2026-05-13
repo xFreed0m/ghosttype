@@ -82,14 +82,27 @@
 
 ### Scope
 
-- [ ] Apply known-example filter to regex matches (AKIAIOSFODNN7EXAMPLE etc.)
-- [ ] `severity` field on Finding (critical/high/medium)
-- [ ] Sort findings: high severity first, then by type
-- [ ] Claude Code: scan history.jsonl (command history with credential args)
-- [ ] Cursor: scan workspaceStorage/*.vscdb (not just globalStorage)
-- [ ] More token patterns: Hugging Face, DigitalOcean, GitHub OAuth/Refresh
-- [ ] `ghosttype version` command
-- [ ] Rich summary breakdown (by type + by tool)
-- [ ] `--allow-list` file for suppressing reviewed FPs
-- [ ] `--stats-only` flag
+- [x] Apply known-example filter to regex matches (AKIAIOSFODNN7EXAMPLE etc.)
+- [x] `severity` field on Finding (critical/high/medium)
+- [x] Sort findings: high severity first, then by type
+- [x] Claude Code: scan history.jsonl (command history with credential args)
+- [x] Cursor: scan workspaceStorage/*.vscdb (not just globalStorage)
+- [x] More token patterns: Hugging Face, DigitalOcean, GitHub OAuth/Refresh
+- [x] `ghosttype version` command
+- [x] Rich summary breakdown (by type + by tool)
+- [x] `--allow-list` file for suppressing reviewed FPs
+- [x] `--stats-only` flag
+
+---
+
+## v4.0 - Polish and Performance (in progress)
+
+### Scope
+
+- [x] PEM key: negative lookbehind prevents matching inside quoted strings
+- [x] `--max-age-days` filter: only scan files modified within N days
+- [x] Supabase service role key heuristic detection
+- [ ] Backtick exclusion from connection_string values
+- [ ] Localhost connection strings excluded from known examples
+- [ ] v0.2.0 release
 

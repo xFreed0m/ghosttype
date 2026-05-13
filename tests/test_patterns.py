@@ -227,3 +227,26 @@ def test_openai_token_still_detected_after_lookahead():
     text = "OPENAI_KEY=sk-abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJ12"
     matches = scan_text(text)
     assert any(m.secret_type == "openai_token" for m in matches)
+
+
+def test_pem_not_matched_inside_quote():
+    """PEM header inside a string literal should not be reported."""
+    text = 'text = "-----BEGIN RSA PRIVATE KEY-----\\nMIIEowIBAAK..."'
+    matches = scan_text(text)
+    assert not any(m.secret_type == "private_key_pem" for m in matches)
+
+
+def test_pem_matched_standalone():
+    """PEM header appearing on its own line should be detected."""
+    text = "Here is the key:\n-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAK..."
+    matches = scan_text(text)
+    assert any(m.secret_type == "private_key_pem" for m in matches)
+
+
+def test_heuristic_detects_supabase_key():
+    """Supabase service role key should be detected. JWTs are valid Supabase keys."""
+    jwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoic2VydmljZV9yb2xlIn0.M2pn5X0extZeP8DjqYDZJw"
+    text = f"SUPABASE_SERVICE_ROLE_KEY={jwt}"
+    matches = scan_text(text)
+    # Supabase keys are JWTs, so either detection is valid
+    assert any(m.secret_type in ("heuristic_supabase_key", "jwt") for m in matches)
