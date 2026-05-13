@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import sys
+import tempfile
 from collections import Counter
 from pathlib import Path
 
@@ -46,7 +48,7 @@ def version() -> None:
     help="Scan only this tool",
 )
 @click.option("--format", "fmt", default="both", type=click.Choice(["json", "csv", "both"]), show_default=True)
-@click.option("--output", default="./ghosttype_report", show_default=True, help="Output directory")
+@click.option("--output", default="./ghosttype_report", show_default=True, help="Output directory or - for stdout (JSON only)")
 @click.option("--redact", is_flag=True, default=False, help="Redact secret values in output files")
 @click.option("--context-window", default=200, show_default=True, help="Context characters around each match")
 @click.option("--copy-sources", is_flag=True, default=False, help="Copy source conversation files to output dir (may contain sensitive content)")
@@ -75,12 +77,18 @@ def scan(
     max_age_days: int | None,
 ) -> None:
     """Scan AI tool conversation files for credentials and secrets."""
-    if not quiet:
-        _print_banner()
-    out_dir = Path(output)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    stdout_mode = output == "-"
 
-    if not quiet:
+    if not quiet and not stdout_mode:
+        _print_banner()
+
+    if stdout_mode:
+        out_dir = Path(tempfile.mkdtemp())
+    else:
+        out_dir = Path(output)
+        out_dir.mkdir(parents=True, exist_ok=True)
+
+    if not quiet and not stdout_mode:
         console.print(f"[bold]ghosttype[/bold] scanning... output -> [cyan]{out_dir}[/cyan]")
 
     orch = Orchestrator(context_window=context_window, max_age_days=max_age_days)
@@ -116,22 +124,42 @@ def scan(
             console.print(f"[green]{len(findings)} finding(s) discovered.[/green]")
 
     if findings:
-        if fmt in ("json", "both"):
-            write_json(findings, out_dir / "findings.json", redact=redact)
-        if fmt in ("csv", "both"):
-            write_csv(findings, out_dir / "findings.csv", redact=redact)
-        if copy_sources:
-            copy_sources_fn(findings, out_dir / "sources")
-            if not quiet:
-                console.print(f"[dim]Source files copied to {out_dir / 'sources'}[/dim]")
+        if stdout_mode:
+            # Write JSON to stdout only
+            data = [
+                {
+                    "tool": f.tool,
+                    "secret_type": f.secret_type,
+                    "severity": f.severity,
+                    "secret_value": "***REDACTED***" if redact else f.secret_value,
+                    "file_path": str(f.file_path),
+                    "position": f.position,
+                    "confidence": f.confidence,
+                    "context": f.context,
+                    "discovered_at": f.discovered_at.isoformat(),
+                }
+                for f in findings
+            ]
+            sys.stdout.write(json.dumps(data, indent=2))
+            sys.stdout.write("\n")
+        else:
+            if fmt in ("json", "both"):
+                write_json(findings, out_dir / "findings.json", redact=redact)
+            if fmt in ("csv", "both"):
+                write_csv(findings, out_dir / "findings.csv", redact=redact)
+            if copy_sources:
+                copy_sources_fn(findings, out_dir / "sources")
+                if not quiet:
+                    console.print(f"[dim]Source files copied to {out_dir / 'sources'}[/dim]")
     else:
-        if not quiet:
+        if not quiet and not stdout_mode:
             console.print("[dim]No output files written.[/dim]")
 
-    if not stats_only:
-        _print_summary(findings, orch.files_scanned)
-    else:
-        _print_stats_only(findings, orch.files_scanned)
+    if not stdout_mode:
+        if not stats_only:
+            _print_summary(findings, orch.files_scanned)
+        else:
+            _print_stats_only(findings, orch.files_scanned)
 
     if findings:
         sys.exit(1)  # non-zero exit when credentials found - enables CI use
