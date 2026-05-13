@@ -9,8 +9,9 @@ from ghosttype.models import PatternMatch
 # Layer 1: known credential formats (confidence: high)
 _REGEX_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("aws_access_key", re.compile(r"(?<![A-Z0-9])(AKIA[0-9A-Z]{16})(?![A-Z0-9])")),
-    # OpenAI tokens: classic sk- and newer sk-proj- formats
-    ("openai_token", re.compile(r"\b(sk-(?:proj-)?[a-zA-Z0-9\-_]{20,})\b")),
+    # OpenAI tokens: classic sk- and newer sk-proj- formats.
+    # Negative lookahead (?!ant-) prevents overlap with anthropic_key (sk-ant-...).
+    ("openai_token", re.compile(r"\b(sk-(?!ant-)(?:proj-)?[a-zA-Z0-9\-_]{20,})\b")),
     ("github_pat_classic", re.compile(r"\b(ghp_[a-zA-Z0-9]{36,})\b")),
     ("github_pat_fine", re.compile(r"\b(github_pat_[a-zA-Z0-9_]{82})\b")),
     ("anthropic_key", re.compile(r"\b(sk-ant-[a-zA-Z0-9\-]{20,})\b")),
@@ -30,7 +31,7 @@ _REGEX_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     (
         "connection_string",
         re.compile(
-            r"((?:postgresql|mysql|mongodb|redis)://[^\s\"\'<>\n]{8,})"
+            r"((?:postgresql|mysql|mongodb|redis)://[^\s\"\'<>`\n]{8,})"
         ),
     ),
     # Stripe keys
@@ -61,6 +62,18 @@ _REGEX_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("github_oauth_token", re.compile(r"\b(gho_[a-zA-Z0-9]{36})\b")),
     # GitHub refresh tokens
     ("github_refresh_token", re.compile(r"\b(ghr_[a-zA-Z0-9]{76})\b")),
+    # GCP API keys (browser/server keys)
+    ("gcp_api_key",         re.compile(r"\b(AIzaSy[a-zA-Z0-9_-]{33})\b")),
+    # AWS STS temporary tokens (ASIA prefix)
+    ("aws_sts_token",       re.compile(r"(?<![A-Z0-9])(ASIA[0-9A-Z]{16})(?![A-Z0-9])")),
+    # Docker Hub personal access tokens
+    ("dockerhub_token",     re.compile(r"\b(dckr_pat_[a-zA-Z0-9_-]{20,})\b")),
+    # Pulumi access tokens
+    ("pulumi_token",        re.compile(r"\b(pul-[a-zA-Z0-9]{40})\b")),
+    # Doppler service tokens
+    ("doppler_token",       re.compile(r"\b(dp\.st\.[a-zA-Z0-9]{43})\b")),
+    # PyPI API tokens
+    ("pypi_token",          re.compile(r"\b(pypi-[a-zA-Z0-9_-]{100,})\b")),
 ]
 
 # Layer 2: variable-name context signals (confidence: medium)
@@ -164,6 +177,8 @@ _KNOWN_EXAMPLE_VALUES: frozenset[str] = frozenset({
     # AWS documentation canonical example credentials
     "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
     "AKIAIOSFODNN7EXAMPLE",
+    # AWS STS docs canonical example token prefix
+    "ASIAIOSFODNN7EXAMPLE",
     # Famous test passwords
     "hunter2supersecretvalue",
     "hunter2",
@@ -186,6 +201,13 @@ _KNOWN_EXAMPLE_VALUES: frozenset[str] = frozenset({
     "dapi1234567890abcdef1234567890abcdef",
     "npm_1234567890abcdefghijklmnopqrstuvwxyz",
     "123456789:AABBccDDeeffGGhhIIjjKKllMMnnOOppQQrr",
+    # Common test connection strings
+    "postgresql://user:password@localhost:5432/mydb",
+    "postgresql://user:password@localhost/mydb",
+    "mysql://user:password@localhost:3306/mydb",
+    "mongodb://user:password@localhost:27017/mydb",
+    # GCP API key test value
+    "AIzaSyAbCdEfGhIjKlMnOpQrStUvWxYz1234567",
 })
 
 

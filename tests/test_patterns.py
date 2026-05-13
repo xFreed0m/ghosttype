@@ -37,7 +37,7 @@ def test_detects_jwt():
 
 
 def test_detects_connection_string():
-    text = "db = connect('postgresql://user:password@localhost:5432/mydb')"
+    text = "db = connect('postgresql://admin:Tr0ub4dor@prod-db.corp.example.com:5432/appdb')"
     matches = scan_text(text)
     assert any(m.secret_type == "connection_string" for m in matches)
 
@@ -160,3 +160,70 @@ def test_detects_github_refresh_token():
     text = "GH_REFRESH=ghr_" + "A" * 76
     matches = scan_text(text)
     assert any(m.secret_type == "github_refresh_token" for m in matches)
+
+
+def test_detects_gcp_api_key():
+    text = "MAPS_KEY=AIzaSyXp9mK3rT8nQ2vL5wJ4eB7uF1cG6hD0sYZ"  # 6+33=39 chars
+    matches = scan_text(text)
+    assert any(m.secret_type == "gcp_api_key" for m in matches)
+
+
+def test_detects_aws_sts_token():
+    text = "AWS_ACCESS_KEY_ID=ASIAIOSFODNN7TESTKEY"
+    matches = scan_text(text)
+    assert any(m.secret_type == "aws_sts_token" for m in matches)
+
+
+def test_aws_sts_example_value_excluded():
+    """ASIAIOSFODNN7EXAMPLE is the AWS docs STS example and must be suppressed."""
+    text = "AWS_ACCESS_KEY_ID=ASIAIOSFODNN7EXAMPLE"
+    matches = scan_text(text)
+    assert not any(m.secret_type == "aws_sts_token" for m in matches)
+
+
+def test_detects_dockerhub_token():
+    text = "DOCKER_TOKEN=dckr_pat_AbCdEfGhIjKlMnOpQrStUvWx"
+    matches = scan_text(text)
+    assert any(m.secret_type == "dockerhub_token" for m in matches)
+
+
+def test_detects_pulumi_token():
+    text = "PULUMI_ACCESS_TOKEN=pul-" + "a" * 40
+    matches = scan_text(text)
+    assert any(m.secret_type == "pulumi_token" for m in matches)
+
+
+def test_detects_doppler_token():
+    text = "DOPPLER_TOKEN=dp.st." + "a" * 43
+    matches = scan_text(text)
+    assert any(m.secret_type == "doppler_token" for m in matches)
+
+
+def test_test_connection_string_excluded():
+    """Standard localhost test connection strings should not be reported."""
+    text = "postgresql://user:password@localhost:5432/mydb"
+    matches = scan_text(text)
+    assert not any(m.secret_type == "connection_string" for m in matches)
+
+
+def test_real_connection_string_still_detected():
+    """Production-looking connection strings should still be detected."""
+    text = "postgresql://admin:Tr0ub4dor@prod-db.company.internal:5432/appdb"
+    matches = scan_text(text)
+    assert any(m.secret_type == "connection_string" for m in matches)
+
+
+def test_anthropic_key_not_classified_as_openai_token():
+    """sk-ant- prefixed keys must only match anthropic_key, not openai_token."""
+    text = "API_KEY=sk-ant-api03-abcdefghijklmnopqrstuvwxyz1234567890abc"
+    matches = scan_text(text)
+    types = [m.secret_type for m in matches]
+    assert "anthropic_key" in types
+    assert "openai_token" not in types
+
+
+def test_openai_token_still_detected_after_lookahead():
+    """Negative lookahead for ant- must not break regular sk- OpenAI token detection."""
+    text = "OPENAI_KEY=sk-abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJ12"
+    matches = scan_text(text)
+    assert any(m.secret_type == "openai_token" for m in matches)
