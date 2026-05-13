@@ -21,7 +21,8 @@ _REGEX_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
             r"\b([a-zA-Z0-9\-]+@[a-zA-Z0-9\-]+\.iam\.gserviceaccount\.com)\b"
         ),
     ),
-    ("private_key_pem", re.compile(r"(-----BEGIN [A-Z ]+PRIVATE KEY-----)")),
+    # Negative lookbehind: don't match when PEM header is inside a quoted string or backtick block.
+    ("private_key_pem", re.compile(r'(?<!["\'`])(-----BEGIN [A-Z ]+PRIVATE KEY-----)')),
     (
         "jwt",
         re.compile(
@@ -132,6 +133,13 @@ _HEURISTIC_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
         "heuristic_generic_secret",
         re.compile(
             r"(?i)(?:api[_-]?(?:key|token|secret)|auth[_-]?(?:key|token)|private[_-]?token|access[_-]?key)\s*[=:]\s*[\"']?([a-zA-Z0-9+/=_-]{32,})[\"']?"
+        ),
+    ),
+    # Supabase service role and anon keys (long JWTs with specific structure)
+    (
+        "heuristic_supabase_key",
+        re.compile(
+            r"(?i)(?:SUPABASE_SERVICE_ROLE_KEY|SUPABASE_ANON_KEY|supabase_key)\s*[=:]\s*[\"']?(eyJ[A-Za-z0-9_-]{20,}\.eyJ[A-Za-z0-9_-]{20,}\.[A-Za-z0-9_-]{20,})[\"']?"
         ),
     ),
 ]

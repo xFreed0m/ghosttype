@@ -60,6 +60,7 @@ def version() -> None:
 @click.option("--allow-list", default=None, type=click.Path(exists=True), help="Path to file with known-safe values to suppress (one per line)")
 @click.option("--stats-only", is_flag=True, default=False, help="Print summary statistics only, not full findings table")
 @click.option("--quiet", "-q", is_flag=True, default=False, help="Suppress banner and progress messages (for scripting)")
+@click.option("--max-age-days", default=None, type=int, help="Only scan files modified within the last N days")
 def scan(
     tool: str | None,
     fmt: str,
@@ -71,6 +72,7 @@ def scan(
     allow_list: str | None,
     stats_only: bool,
     quiet: bool,
+    max_age_days: int | None,
 ) -> None:
     """Scan AI tool conversation files for credentials and secrets."""
     if not quiet:
@@ -81,7 +83,7 @@ def scan(
     if not quiet:
         console.print(f"[bold]ghosttype[/bold] scanning... output -> [cyan]{out_dir}[/cyan]")
 
-    orch = Orchestrator(context_window=context_window)
+    orch = Orchestrator(context_window=context_window, max_age_days=max_age_days)
 
     if not quiet:
         from ghosttype.scanners import SCANNERS

@@ -20,17 +20,24 @@ _HIGH_SEVERITY_TYPES = frozenset({
     "private_key_pem",
     "vault_token",
     "heuristic_aws_secret",
+    "heuristic_supabase_key",
 })
 
 
 class Orchestrator:
-    def __init__(self, scanners: list[Scanner] | None = None, context_window: int = 200) -> None:
+    def __init__(
+        self,
+        scanners: list[Scanner] | None = None,
+        context_window: int = 200,
+        max_age_days: int | None = None,
+    ) -> None:
         if scanners is None:
             from ghosttype.scanners import SCANNERS
             self._scanners = SCANNERS
         else:
             self._scanners = scanners
         self._context_window = context_window
+        self._max_age_days = max_age_days
         self.files_scanned: int = 0
 
     def run(self, tool_filter: str | None = None) -> list[Finding]:
@@ -48,6 +55,15 @@ class Orchestrator:
             except Exception:
                 logger.warning("Scanner %s failed during discover", scanner.name, exc_info=True)
                 continue
+
+            # Filter records by age if max_age_days is set
+            if self._max_age_days is not None:
+                from datetime import timedelta
+                cutoff = datetime.now(timezone.utc) - timedelta(days=self._max_age_days)
+                records = [
+                    r for r in records if r.created_at is None or r.created_at >= cutoff
+                ]
+
             self.files_scanned += len({r.source_path for r in records})
             for record in records:
                 try:
