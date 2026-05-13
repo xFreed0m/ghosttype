@@ -34,7 +34,7 @@ def cli() -> None:
 @cli.command()
 def version() -> None:
     """Print version information."""
-    console.print("[bold cyan]ghosttype[/bold cyan] [dim]v0.1.0[/dim]")
+    console.print("[bold cyan]ghosttype[/bold cyan] [dim]v0.2.0[/dim]")
     console.print("[dim]credential scanner for AI tool conversation history[/dim]")
 
 
@@ -158,7 +158,7 @@ def _print_banner() -> None:
     console.print(_BANNER, highlight=False)
     console.print(
         "  [dim]credential scanner for AI tool conversation history[/dim]"
-        "  [dim red]authorized use only[/dim red]  [dim]v0.1.0[/dim]\n"
+        "  [dim red]authorized use only[/dim red]  [dim]v0.2.0[/dim]\n"
     )
 
 

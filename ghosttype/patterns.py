@@ -30,7 +30,7 @@ _REGEX_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     (
         "connection_string",
         re.compile(
-            r"((?:postgresql|mysql|mongodb|redis)://[^\s\"\'<>\n]{8,})"
+            r"((?:postgresql|mysql|mongodb|redis)://[^\s\"\'<>`\n]{8,})"
         ),
     ),
     # Stripe keys

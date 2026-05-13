@@ -82,7 +82,7 @@ def test_version_command():
     result = runner.invoke(cli, ["version"])
     assert result.exit_code == 0
     assert "ghosttype" in result.output
-    assert "v0.1.0" in result.output
+    assert "v0.2.0" in result.output
     assert "credential scanner" in result.output
 
 
