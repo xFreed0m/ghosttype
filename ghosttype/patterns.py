@@ -9,8 +9,9 @@ from ghosttype.models import PatternMatch
 # Layer 1: known credential formats (confidence: high)
 _REGEX_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("aws_access_key", re.compile(r"(?<![A-Z0-9])(AKIA[0-9A-Z]{16})(?![A-Z0-9])")),
-    # OpenAI tokens: classic sk- and newer sk-proj- formats
-    ("openai_token", re.compile(r"\b(sk-(?:proj-)?[a-zA-Z0-9\-_]{20,})\b")),
+    # OpenAI tokens: classic sk- and newer sk-proj- formats.
+    # Negative lookahead (?!ant-) prevents overlap with anthropic_key (sk-ant-...).
+    ("openai_token", re.compile(r"\b(sk-(?!ant-)(?:proj-)?[a-zA-Z0-9\-_]{20,})\b")),
     ("github_pat_classic", re.compile(r"\b(ghp_[a-zA-Z0-9]{36,})\b")),
     ("github_pat_fine", re.compile(r"\b(github_pat_[a-zA-Z0-9_]{82})\b")),
     ("anthropic_key", re.compile(r"\b(sk-ant-[a-zA-Z0-9\-]{20,})\b")),
