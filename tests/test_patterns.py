@@ -211,3 +211,19 @@ def test_real_connection_string_still_detected():
     text = "postgresql://admin:Tr0ub4dor@prod-db.company.internal:5432/appdb"
     matches = scan_text(text)
     assert any(m.secret_type == "connection_string" for m in matches)
+
+
+def test_anthropic_key_not_classified_as_openai_token():
+    """sk-ant- prefixed keys must only match anthropic_key, not openai_token."""
+    text = "API_KEY=sk-ant-api03-abcdefghijklmnopqrstuvwxyz1234567890abc"
+    matches = scan_text(text)
+    types = [m.secret_type for m in matches]
+    assert "anthropic_key" in types
+    assert "openai_token" not in types
+
+
+def test_openai_token_still_detected_after_lookahead():
+    """Negative lookahead for ant- must not break regular sk- OpenAI token detection."""
+    text = "OPENAI_KEY=sk-abcdefghijklmnopqrstuvwxyz1234567890ABCDEFGHIJ12"
+    matches = scan_text(text)
+    assert any(m.secret_type == "openai_token" for m in matches)
