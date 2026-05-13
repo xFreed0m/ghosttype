@@ -37,7 +37,7 @@ def test_detects_jwt():
 
 
 def test_detects_connection_string():
-    text = "db = connect('postgresql://user:password@localhost:5432/mydb')"
+    text = "db = connect('postgresql://admin:Tr0ub4dor@prod-db.corp.example.com:5432/appdb')"
     matches = scan_text(text)
     assert any(m.secret_type == "connection_string" for m in matches)
 
@@ -163,7 +163,7 @@ def test_detects_github_refresh_token():
 
 
 def test_detects_gcp_api_key():
-    text = "MAPS_KEY=AIzaSyAbCdEfGhIjKlMnOpQrStUvWxYz1234567"
+    text = "MAPS_KEY=AIzaSyXp9mK3rT8nQ2vL5wJ4eB7uF1cG6hD0sYZ"  # 6+33=39 chars
     matches = scan_text(text)
     assert any(m.secret_type == "gcp_api_key" for m in matches)
 
@@ -179,3 +179,35 @@ def test_aws_sts_example_value_excluded():
     text = "AWS_ACCESS_KEY_ID=ASIAIOSFODNN7EXAMPLE"
     matches = scan_text(text)
     assert not any(m.secret_type == "aws_sts_token" for m in matches)
+
+
+def test_detects_dockerhub_token():
+    text = "DOCKER_TOKEN=dckr_pat_AbCdEfGhIjKlMnOpQrStUvWx"
+    matches = scan_text(text)
+    assert any(m.secret_type == "dockerhub_token" for m in matches)
+
+
+def test_detects_pulumi_token():
+    text = "PULUMI_ACCESS_TOKEN=pul-" + "a" * 40
+    matches = scan_text(text)
+    assert any(m.secret_type == "pulumi_token" for m in matches)
+
+
+def test_detects_doppler_token():
+    text = "DOPPLER_TOKEN=dp.st." + "a" * 43
+    matches = scan_text(text)
+    assert any(m.secret_type == "doppler_token" for m in matches)
+
+
+def test_test_connection_string_excluded():
+    """Standard localhost test connection strings should not be reported."""
+    text = "postgresql://user:password@localhost:5432/mydb"
+    matches = scan_text(text)
+    assert not any(m.secret_type == "connection_string" for m in matches)
+
+
+def test_real_connection_string_still_detected():
+    """Production-looking connection strings should still be detected."""
+    text = "postgresql://admin:Tr0ub4dor@prod-db.company.internal:5432/appdb"
+    matches = scan_text(text)
+    assert any(m.secret_type == "connection_string" for m in matches)

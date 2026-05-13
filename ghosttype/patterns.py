@@ -65,6 +65,14 @@ _REGEX_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     ("gcp_api_key",         re.compile(r"\b(AIzaSy[a-zA-Z0-9_-]{33})\b")),
     # AWS STS temporary tokens (ASIA prefix)
     ("aws_sts_token",       re.compile(r"(?<![A-Z0-9])(ASIA[0-9A-Z]{16})(?![A-Z0-9])")),
+    # Docker Hub personal access tokens
+    ("dockerhub_token",     re.compile(r"\b(dckr_pat_[a-zA-Z0-9_-]{20,})\b")),
+    # Pulumi access tokens
+    ("pulumi_token",        re.compile(r"\b(pul-[a-zA-Z0-9]{40})\b")),
+    # Doppler service tokens
+    ("doppler_token",       re.compile(r"\b(dp\.st\.[a-zA-Z0-9]{43})\b")),
+    # PyPI API tokens
+    ("pypi_token",          re.compile(r"\b(pypi-[a-zA-Z0-9_-]{100,})\b")),
 ]
 
 # Layer 2: variable-name context signals (confidence: medium)
@@ -192,6 +200,13 @@ _KNOWN_EXAMPLE_VALUES: frozenset[str] = frozenset({
     "dapi1234567890abcdef1234567890abcdef",
     "npm_1234567890abcdefghijklmnopqrstuvwxyz",
     "123456789:AABBccDDeeffGGhhIIjjKKllMMnnOOppQQrr",
+    # Common test connection strings
+    "postgresql://user:password@localhost:5432/mydb",
+    "postgresql://user:password@localhost/mydb",
+    "mysql://user:password@localhost:3306/mydb",
+    "mongodb://user:password@localhost:27017/mydb",
+    # GCP API key test value
+    "AIzaSyAbCdEfGhIjKlMnOpQrStUvWxYz1234567",
 })
 
 
