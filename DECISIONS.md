@@ -4,7 +4,42 @@ Key design decisions with rationale. Useful for contributors evaluating trade-of
 
 ---
 
-## TruffleHog as THE detection + verification engine (v0.3.0)
+## Dual complementary engines (v0.4.0) — supersedes the v0.3.0 "THE engine" decision
+
+**Decision:** Restore the in-tree regex/heuristic pattern engine and run it
+*alongside* TruffleHog, not instead of it. New `--engine {both,trufflehog,patterns}`
+flag, default `both`. Findings carry a `source` field (`trufflehog` |
+`ghosttype-pattern`). When both engines hit the same `(secret_value, file_path)`,
+the TruffleHog finding wins (it carries verification + detector metadata);
+pattern-only hits are kept.
+
+**Why the v0.3.0 "supplant" decision was reversed:** The two engines catch
+different things, measured on a real 1464-file corpus:
+
+- TruffleHog alone: 14 findings — detectors ghosttype never had (Box, Dockerhub,
+  UnifyID, URI) plus live verification.
+- Patterns alone: 71 findings — dominated by the **heuristic layer**
+  (`heuristic_token`, `heuristic_api_key`, `heuristic_password`,
+  `heuristic_jwt_secret`): loose variable-name context signals
+  (`api_key=`, `password=`) that TruffleHog's structural detectors do not match.
+- Both: 79 findings (14 + 65, with 6 overlapping GitHub PATs deduped to the
+  verifiable TruffleHog hit).
+
+Neither is a superset of the other. Supplanting lost the heuristic safety net;
+keeping only patterns loses verification and 800+ detectors. Complementary is
+strictly better for the red-team / DLP use case where a missed credential is
+the expensive failure.
+
+**Trade-off acknowledged:** `both` is noisier (79 vs 14). The heuristic layer
+is medium-confidence by design. Operators who want signal-only run
+`--engine trufflehog --only-verified`; operators doing exhaustive sweeps run
+`both`. The `--min-confidence` filter is now dual-engine aware: `verified`
+keeps only TruffleHog-verified, `high` keeps verified + regex-high and drops
+medium heuristics.
+
+---
+
+## TruffleHog as THE detection + verification engine (v0.3.0 — SUPERSEDED by v0.4.0)
 
 **Decision:** Replace the in-tree regex/heuristic pattern engine with a TruffleHog subprocess invoked in `filesystem` mode. ghosttype writes extracted text chunks to a temp directory, runs `trufflehog filesystem --json --no-update ...`, and parses NDJSON results back into `Finding`s.
 
@@ -21,11 +56,21 @@ Key design decisions with rationale. Useful for contributors evaluating trade-of
 
 ---
 
-## No silent fallback when TruffleHog is missing (v0.3.0)
+## TruffleHog-missing behavior is engine-dependent (v0.4.0; refines v0.3.0)
 
-**Decision:** If the TruffleHog binary cannot be resolved (PATH lookup + `GHOSTTYPE_TRUFFLEHOG_BIN` env + `--trufflehog-binary` flag all failed), ghosttype exits 2 with an actionable error pointing at the install docs.
+**Decision:**
+- `--engine trufflehog`: missing binary is a hard failure — exit 2 with the
+  install URL, env var, and CLI flag (unchanged from v0.3.0).
+- `--engine both` (default): missing binary degrades to patterns-only with a
+  **visible yellow warning**, then continues. Not silent, not exit 2.
+- `--engine patterns`: the binary is never resolved at all.
 
-**Why:** Silent fallback to regex-only scanning would mean some users silently get worse coverage and no verification while believing they're running ghosttype as advertised. Better to fail loudly. The error message includes the install URL, the env var, and the CLI flag — three remediation paths in one error.
+**Why the v0.3.0 hard-fail was relaxed for `both`:** v0.3.0 had no other
+engine, so "no TruffleHog" meant "no scanning" — failing loud was correct.
+v0.4.0 has a real second engine. When the user asked for `both` and TruffleHog
+is absent, refusing to run at all is worse than running the pattern engine and
+saying so. The principle ("never a *silent* downgrade") is preserved by the
+mandatory warning; only the response to it changed.
 
 ---
 

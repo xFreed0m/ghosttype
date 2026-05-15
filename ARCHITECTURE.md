@@ -5,9 +5,11 @@
 ghosttype is a CLI with a two-layer pipeline:
 
 1. **Discovery layer (in-tree):** per-tool scanner modules that know where each AI tool stores conversation history and how to read it (SQLite schemas, JSONL, Electron `safeStorage`).
-2. **Detection + verification layer (subprocess):** the [TruffleHog](https://github.com/trufflesecurity/trufflehog) binary, invoked with `filesystem` mode, owns all credential pattern matching AND verification against provider APIs.
+2. **Detection layer — two complementary engines** driven by the Orchestrator over the same extracted chunks:
+   - **TruffleHog subprocess** (`trufflehog_engine.py`): the [TruffleHog](https://github.com/trufflesecurity/trufflehog) binary in `filesystem` mode — 800+ structural detectors with live API verification.
+   - **In-tree pattern engine** (`pattern_engine.py` wrapping `patterns.py`): 30 regex + 10 heuristic patterns, offline, unverifiable, catching loose context signals TruffleHog's structural detectors miss.
 
-ghosttype no longer ships its own regex catalog. The pattern catalog (and the entropy filter, known-example exclusion list, and 800+ verifiers) live in TruffleHog. Replacing the in-tree engine with a TruffleHog subprocess is what 0.3.0 changed.
+`--engine` selects `both` (default, merged — TruffleHog wins `(value, file)` overlaps), `trufflehog`, or `patterns` (no binary required). Every `Finding` carries a `source` field. v0.3.0 supplanted the pattern engine with TruffleHog; v0.4.0 restored it as a complement after a real-corpus measurement showed neither engine is a superset of the other (see DECISIONS.md).
 
 ## Directory layout
 
@@ -195,4 +197,7 @@ Discovery is still ghosttype's job. To add a new AI tool:
 
 ## Adding a new credential type
 
-You don't. TruffleHog ships detectors. If a credential type isn't being detected, upgrade TruffleHog (or open an issue/PR against TruffleHog upstream).
+Two paths, depending on the kind:
+
+- **Structural, verifiable credential** (fixed prefix/shape, has a provider API to check against): it belongs in TruffleHog. Upgrade TruffleHog or open a PR against TruffleHog upstream — don't add a structural regex here that just duplicates a detector.
+- **Loose context signal** (e.g. a new `*_TOKEN=` style variable name with no fixed value shape, unverifiable): add it to the heuristic layer in `ghosttype/patterns.py` `_HEURISTIC_PATTERNS`, with a test in `tests/test_patterns.py`. This is exactly the niche the in-tree engine exists to cover.

@@ -10,6 +10,7 @@ from ghosttype.models import Finding
 
 _FIELDS = [
     "tool",
+    "source",
     "secret_type",
     "detector_name",
     "severity",
@@ -28,6 +29,7 @@ _FIELDS = [
 def _finding_to_dict(f: Finding, redact: bool = False) -> dict:
     return {
         "tool": f.tool,
+        "source": f.source,
         "secret_type": f.secret_type,
         "detector_name": f.detector_name,
         "severity": f.severity,

@@ -1,10 +1,28 @@
 # Roadmap
 
-## Current: v0.3.0
+## Current: v0.4.0
+
+Dual complementary engines. Local scanner on macOS, all five AI tools.
+
+**Shipped (v0.4.0):**
+- In-tree regex/heuristic pattern engine restored and running *alongside*
+  TruffleHog (`ghosttype/pattern_engine.py` wrapping `ghosttype/patterns.py`)
+- `--engine {both,trufflehog,patterns}` (default `both`)
+- `source` field on every finding (`trufflehog` | `ghosttype-pattern`)
+- Cross-engine dedup: TruffleHog wins `(value, file)` overlaps
+- `--engine patterns` runs fully offline (no TruffleHog binary needed)
+- `--engine both` gracefully degrades to patterns-only (visible warning) if
+  TruffleHog is missing
+- Dual-engine-aware `--min-confidence`; `By Source` stats column
+- 127 tests (restored pattern suite + dual-engine + live integration)
+
+---
+
+## v0.3.0
 
 TruffleHog-powered detection + verification. Local scanner on macOS, all five AI tools.
 
-**Shipped:**
+**Shipped (v0.3.0):**
 - Claude Code, Cursor, Codex, ChatGPT, Claude Desktop scanners (discovery layer)
 - TruffleHog subprocess engine — 800+ detectors, live API verification, entropy filter, known-example exclusion
 - `--only-verified` for triage on confirmed-live credentials

@@ -12,7 +12,12 @@ Local forensic scanner that extracts **and verifies** credentials from AI tool c
 
 ghosttype scans AI tool conversation files for exposed credentials, then asks TruffleHog whether each one is **actually live** by hitting the issuing provider's verification endpoint. Findings are emitted as JSON + CSV, each linked back to the source conversation.
 
-**The detection + verification engine is TruffleHog.** ghosttype owns the discovery layer (where each AI tool stores its conversations and how to decode them); TruffleHog owns 800+ detectors, the verifiers, the entropy filters, and the known-example exclusions. We don't ship our own pattern catalog.
+**Two complementary detection engines** (since v0.4.0):
+
+- **TruffleHog** — 800+ structural detectors with live API verification, entropy filtering, known-example exclusion. The only engine that can prove a credential is *live*.
+- **In-tree pattern engine** — 30 regex + 10 heuristic patterns. Offline, never verified, but catches loose variable-name context signals (`api_key=`, `password=`, `JWT_SECRET=`) that TruffleHog's structural detectors don't match.
+
+By default both run and results are merged (`--engine both`); on a `(secret_value, file)` overlap the TruffleHog finding wins because it carries verification. Choose one with `--engine {both,trufflehog,patterns}`. ghosttype always owns the discovery layer — where each AI tool stores conversations and how to decode them. Every finding carries a `source` field so you know which engine produced it.
 
 **Supported AI tools:**
 
@@ -102,9 +107,13 @@ ghosttype scan [OPTIONS]
   --tool TEXT                  Scan one tool: cursor, chatgpt, codex, claude, claude_code
   --format [json|csv|both]     Output format (default: both)
   --output TEXT                Output dir, or - for stdout JSON (default: ./ghosttype_report)
+  --engine [both|trufflehog|patterns]
+                               Detection engine (default: both). 'patterns'
+                               needs no TruffleHog binary.
   --redact                     Mask secret values in output
-  --min-confidence             Filter: verified or unverified (default: unverified)
-                               (legacy: high, medium also accepted)
+  --min-confidence             verified | unverified (default: unverified)
+                               'verified' = TruffleHog-verified only;
+                               'high' (legacy) also keeps regex pattern hits
   --only-verified              Pass --results=verified to TruffleHog
   --no-verification            Skip live verifier calls (fast, offline)
   --trufflehog-binary PATH     Override the TruffleHog binary

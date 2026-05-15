@@ -23,7 +23,7 @@ from ghosttype.trufflehog_engine import (
     trufflehog_version,
 )
 
-VERSION = "0.3.0"
+VERSION = "0.4.0"
 console = Console()
 
 _GHOST = r'''
@@ -106,6 +106,16 @@ def doctor(trufflehog_binary: str | None) -> None:
     show_default=True,
     help="Output directory or - for stdout (JSON only)",
 )
+@click.option(
+    "--engine",
+    default="both",
+    type=click.Choice(["both", "trufflehog", "patterns"]),
+    show_default=True,
+    help="Detection engine. 'both' (default) runs TruffleHog + the in-tree "
+    "regex/heuristic patterns and merges (TruffleHog wins overlaps). "
+    "'trufflehog' = verified detection only. 'patterns' = offline, no "
+    "TruffleHog binary required, never verified.",
+)
 @click.option("--redact", is_flag=True, default=False, help="Redact secret values in output files")
 @click.option("--context-window", default=200, show_default=True, help="Context characters around each match")
 @click.option(
@@ -160,6 +170,7 @@ def scan(
     tool: str | None,
     fmt: str,
     output: str,
+    engine: str,
     redact: bool,
     context_window: int,
     copy_sources: bool,
@@ -174,7 +185,11 @@ def scan(
     verbose: bool,
     max_age_days: int | None,
 ) -> None:
-    """Scan AI tool conversation files for credentials and secrets via TruffleHog."""
+    """Scan AI tool conversation files for credentials and secrets.
+
+    By default both engines run: TruffleHog (verified, structural) and the
+    in-tree regex/heuristic patterns (offline, complementary). See --engine.
+    """
     if verbose:
         import logging
         logging.basicConfig(level=logging.INFO, format="[ghosttype] %(message)s")
@@ -193,17 +208,29 @@ def scan(
         console.print(f"[bold]ghosttype[/bold] scanning... output -> [cyan]{out_dir}[/cyan]")
 
     # Resolve trufflehog upfront so a missing binary fails fast (not after
-    # discovering 500 conversation files).
-    binary_arg = trufflehog_binary or os.environ.get("GHOSTTYPE_TRUFFLEHOG_BIN")
-    try:
-        resolved_binary = resolve_binary(binary_arg)
-    except TruffleHogNotFoundError as exc:
-        console.print(f"[red]{exc}[/red]")
-        sys.exit(2)
+    # discovering 500 conversation files). Skipped entirely for the
+    # patterns-only engine, which needs no binary.
+    resolved_binary: str | None = None
+    if engine in ("both", "trufflehog"):
+        binary_arg = trufflehog_binary or os.environ.get("GHOSTTYPE_TRUFFLEHOG_BIN")
+        try:
+            resolved_binary = resolve_binary(binary_arg)
+        except TruffleHogNotFoundError as exc:
+            if engine == "both":
+                console.print(
+                    "[yellow]TruffleHog not found — falling back to "
+                    "patterns-only engine (no verification).[/yellow]\n"
+                    f"[dim]{exc}[/dim]"
+                )
+                engine = "patterns"
+            else:
+                console.print(f"[red]{exc}[/red]")
+                sys.exit(2)
 
     orch = Orchestrator(
         context_window=context_window,
         max_age_days=max_age_days,
+        engine=engine,
         verify=not no_verification,
         only_verified=only_verified,
         trufflehog_binary=resolved_binary,
@@ -225,8 +252,18 @@ def scan(
         console.print(f"[red]TruffleHog engine failed:[/red] {exc}")
         sys.exit(2)
 
-    if min_confidence in ("verified", "high"):
+    # Confidence filter, dual-engine aware:
+    #   verified  -> only TruffleHog-verified findings
+    #   high      -> verified TruffleHog OR high-confidence (regex) pattern hits;
+    #                drops medium heuristic noise (legacy alias)
+    #   unverified/medium -> keep everything (default)
+    if min_confidence == "verified":
         findings = [f for f in findings if f.verified]
+    elif min_confidence == "high":
+        findings = [
+            f for f in findings
+            if f.verified or f.confidence in ("verified", "high")
+        ]
 
     # Apply allow-list suppression
     suppressed_count = 0
@@ -258,6 +295,7 @@ def scan(
             data = [
                 {
                     "tool": f.tool,
+                    "source": f.source,
                     "secret_type": f.secret_type,
                     "detector_name": f.detector_name,
                     "severity": f.severity,
@@ -335,6 +373,7 @@ def _print_summary(findings: list[Finding], files_scanned: int) -> None:
 
     table = Table(title="Findings Summary", show_header=True)
     table.add_column("Tool")
+    table.add_column("Source")
     table.add_column("Detector")
     table.add_column("Severity")
     table.add_column("Verified")
@@ -346,8 +385,13 @@ def _print_summary(findings: list[Finding], files_scanned: int) -> None:
             else "dim"
         )
         verified_cell = "[green]yes[/green]" if f.verified else "[dim]no[/dim]"
+        source_cell = (
+            "[cyan]trufflehog[/cyan]" if f.source == "trufflehog"
+            else "[magenta]pattern[/magenta]"
+        )
         table.add_row(
             f.tool,
+            source_cell,
             f.detector_name or f.secret_type,
             f"[{severity_style}]{f.severity}[/{severity_style}]",
             verified_cell,
@@ -385,8 +429,14 @@ def _print_stats_only(findings: list[Finding], files_scanned: int) -> None:
     verified_table.add_row("verified", str(verified_count))
     verified_table.add_row("unverified", str(len(findings) - verified_count))
 
+    source_table = Table(title="By Source", show_header=True, box=None)
+    source_table.add_column("Source", style="blue")
+    source_table.add_column("Count", justify="right")
+    for src, count in Counter(f.source for f in findings).most_common():
+        source_table.add_row(src, str(count))
+
     console.print()
-    console.print(Columns([type_table, tool_table, verified_table]))
+    console.print(Columns([type_table, tool_table, verified_table, source_table]))
     console.print(
         f"\n[dim]Files scanned: {files_scanned} | Files with findings: {files_with_findings}[/dim]"
     )

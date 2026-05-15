@@ -169,7 +169,8 @@ def test_scan_no_verification_passes_through(tmp_path, monkeypatch):
         assert kwargs["verify"] is False
 
 
-def test_scan_missing_trufflehog_exits_2(tmp_path, monkeypatch):
+def test_scan_missing_trufflehog_engine_trufflehog_exits_2(tmp_path, monkeypatch):
+    """With --engine trufflehog, a missing binary is a hard failure (exit 2)."""
     from ghosttype.trufflehog_engine import TruffleHogNotFoundError
 
     def boom(b=None):
@@ -177,9 +178,53 @@ def test_scan_missing_trufflehog_exits_2(tmp_path, monkeypatch):
 
     monkeypatch.setattr("ghosttype.cli.resolve_binary", boom)
     runner = CliRunner()
-    result = runner.invoke(cli, ["scan", "--output", str(tmp_path / "r")])
+    result = runner.invoke(
+        cli, ["scan", "--engine", "trufflehog", "--output", str(tmp_path / "r")]
+    )
     assert result.exit_code == 2
     assert "nope, no binary" in result.output
+
+
+def test_scan_missing_trufflehog_engine_both_falls_back_to_patterns(tmp_path, monkeypatch):
+    """With the default --engine both, a missing binary degrades to
+    patterns-only with a visible warning (not a silent failure, not exit 2)."""
+    from ghosttype.trufflehog_engine import TruffleHogNotFoundError
+
+    def boom(b=None):
+        raise TruffleHogNotFoundError("no binary here")
+
+    monkeypatch.setattr("ghosttype.cli.resolve_binary", boom)
+    runner = CliRunner()
+    with patch("ghosttype.cli.Orchestrator") as MockOrch:
+        MockOrch.return_value.run.return_value = []
+        MockOrch.return_value.files_scanned = 0
+        result = runner.invoke(cli, ["scan", "--output", str(tmp_path / "r")])
+    assert result.exit_code == 0
+    assert "falling back to patterns-only" in result.output
+    # Orchestrator must have been constructed with engine="patterns"
+    _, kwargs = MockOrch.call_args
+    assert kwargs["engine"] == "patterns"
+
+
+def test_scan_engine_patterns_skips_binary_resolution(tmp_path, monkeypatch):
+    """--engine patterns must not even attempt to resolve the binary."""
+    called = {"resolve": False}
+
+    def tracker(b=None):
+        called["resolve"] = True
+        return "/usr/local/bin/trufflehog"
+
+    monkeypatch.setattr("ghosttype.cli.resolve_binary", tracker)
+    runner = CliRunner()
+    with patch("ghosttype.cli.Orchestrator") as MockOrch:
+        MockOrch.return_value.run.return_value = []
+        MockOrch.return_value.files_scanned = 0
+        runner.invoke(
+            cli, ["scan", "--engine", "patterns", "--output", str(tmp_path / "r")]
+        )
+    assert called["resolve"] is False
+    _, kwargs = MockOrch.call_args
+    assert kwargs["engine"] == "patterns"
 
 
 def test_scan_with_allow_list(tmp_path, monkeypatch):
