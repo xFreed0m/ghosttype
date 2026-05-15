@@ -72,6 +72,35 @@ def test_cursor_corrupt_db_is_logged_not_raised(tmp_path, caplog):
     assert "Failed to read cursor db" in caplog.text
 
 
+def test_cursor_workspace_db_without_composer_table_is_skipped(tmp_path, caplog):
+    """Workspace-storage state.vscdb files often lack the cursorDiskKV table
+    (no Composer history). Those must be skipped quietly, not error out."""
+    db = tmp_path / "state.vscdb"
+    with closing(sqlite3.connect(db)) as conn:
+        conn.execute("CREATE TABLE ItemTable (key TEXT, value TEXT)")  # not cursorDiskKV
+        conn.commit()
+    s = CursorScanner()
+    with patch.object(type(s), "_db_path", new_callable=PropertyMock, return_value=db), \
+         patch.object(type(s), "_workspace_dbs", return_value=[]):
+        with caplog.at_level(logging.DEBUG):
+            assert s.discover() == []
+    assert "no cursorDiskKV table" in caplog.text
+
+
+def test_cursor_other_operational_error_is_warned(tmp_path, caplog):
+    """An OperationalError that is NOT 'no such table' is logged at warning."""
+    s = CursorScanner()
+    with patch("ghosttype.scanners.cursor.sqlite3.connect",
+               side_effect=sqlite3.OperationalError("database is locked")):
+        with patch.object(type(s), "_db_path", new_callable=PropertyMock,
+                           return_value=tmp_path / "state.vscdb"), \
+             patch.object(type(s), "_workspace_dbs", return_value=[]):
+            (tmp_path / "state.vscdb").write_text("x")
+            with caplog.at_level(logging.WARNING):
+                assert s.discover() == []
+    assert "Failed to read cursor db" in caplog.text
+
+
 def test_cursor_workspace_dbs_globs_when_root_exists(tmp_path):
     ws_root = tmp_path / "workspaceStorage"
     (ws_root / "hash1").mkdir(parents=True)
