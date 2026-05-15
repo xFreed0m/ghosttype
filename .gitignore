@@ -1,0 +1,47 @@
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+
+# ghosttype scan output — never commit results
+ghosttype_report/
+*.findings.json
+*.findings.csv
+sources/
+
+# Secrets / credentials
+.env
+.env.*
+*.key
+*.pem
+*.p12
+*.pfx
+auth.json
+credentials.json
+
+# macOS
+.DS_Store
+.AppleDouble
+*.swp
+*.swo
+
+# Editor
+.idea/
+.vscode/
+*.code-workspace
+.cursor/
+
+# OS
+Thumbs.db
+ehthumbs.db

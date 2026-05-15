@@ -1,0 +1,65 @@
+ghosttype - Authorized Use License
+
+Copyright (c) 2026 ghosttype Contributors
+
+TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+1. DEFINITIONS
+
+"Software" refers to ghosttype and all associated source code, binaries, documentation, and configuration files in this repository.
+
+"Authorized Use" means use of the Software exclusively on computer systems, networks, and infrastructure for which you have obtained explicit, prior, written permission from the owner or authorized administrator of those systems, or on systems you personally own.
+
+"You" refers to any individual or organization accessing, using, modifying, or distributing the Software.
+
+2. GRANT OF LICENSE
+
+Subject to the conditions below, you are granted a non-exclusive, non-transferable, worldwide license to:
+
+a) Use, copy, and run the Software for Authorized Use only
+b) Modify the Software for your own Authorized Use
+c) Distribute unmodified or modified copies of the Software, provided all copies include this license and all conditions herein
+
+3. CONDITIONS
+
+This license is conditional on all of the following:
+
+a) AUTHORIZED USE ONLY. You may only use the Software against systems, filesystems, and data for which you possess explicit, prior, written authorization, or which you personally own. "Written authorization" means a signed penetration testing agreement, bug bounty scope definition, explicit written employer policy, or equivalent legal instrument. Verbal authorization is insufficient.
+
+b) NON-COMMERCIAL USE. You may not use the Software for commercial purposes without a separate written agreement with the copyright holder. Commercial purposes includes, but is not limited to: offering the Software as a service, including the Software in a commercial product, or using the Software to provide paid security testing services without written permission from the copyright holder.
+
+c) NO MALICIOUS USE. You may not use the Software to access data without authorization, facilitate unauthorized credential theft, cause damage, or for any purpose that would constitute a criminal or civil offense in any applicable jurisdiction.
+
+d) ATTRIBUTION. Any distribution of the Software, modified or unmodified, must retain this license, all copyright notices, and a clear statement that the Software is for authorized security research and testing only.
+
+e) NO WARRANTY TRANSFER. You may not represent to others that this Software is safe, legal, or appropriate for any particular use. Each user is responsible for their own compliance with applicable laws.
+
+4. DISCLAIMER OF WARRANTIES
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED. THE COPYRIGHT HOLDER MAKES NO REPRESENTATIONS ABOUT THE SUITABILITY OF THIS SOFTWARE FOR ANY PURPOSE. USE AT YOUR OWN RISK.
+
+5. LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES ARISING FROM THE USE OR INABILITY TO USE THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+6. INDEMNIFICATION
+
+You agree to indemnify, defend, and hold harmless the copyright holder from any claims, damages, losses, or expenses (including legal fees) arising from your use of the Software or your violation of this license.
+
+7. TERMINATION
+
+This license terminates automatically if you violate any of its conditions. Upon termination, you must immediately cease all use and destroy all copies of the Software in your possession.
+
+8. GOVERNING LAW
+
+This license shall be governed by the laws applicable in the jurisdiction where the user operates, without regard to conflict of law provisions.
+
+---
+
+BY USING THIS SOFTWARE, YOU ACKNOWLEDGE THAT YOU HAVE READ THIS LICENSE, UNDERSTAND IT, AND AGREE TO BE BOUND BY ITS TERMS. YOU REPRESENT THAT YOU HAVE OBTAINED ALL NECESSARY AUTHORIZATIONS BEFORE USING THIS SOFTWARE.
+
+If you do not agree to these terms, you are not permitted to use this Software.
+
+---
+
+NOTICE: This software is designed and intended exclusively for authorized penetration testing, red team operations, security research, and DLP/blue team auditing on systems you own or are explicitly authorized to test. Unauthorized use may violate computer crime laws including but not limited to: the Computer Fraud and Abuse Act (USA), the Computer Misuse Act (UK), and equivalent legislation in other jurisdictions. The authors expressly disclaim any responsibility for unauthorized or malicious use of this software.
