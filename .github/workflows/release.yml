@@ -46,7 +46,9 @@ jobs:
       - name: Install build backend (hashed closure)
         run: |
           set -euo pipefail
-          python -m pip install --upgrade pip
+          # No unpinned `pip install --upgrade pip` (Scorecard
+          # Pinned-Dependencies): runner pip from the SHA-pinned
+          # actions/setup-python already supports --require-hashes.
           pip install --require-hashes -r requirements.lock
 
       - name: Build sdist + wheel
@@ -122,7 +124,8 @@ jobs:
           set -euo pipefail
           pip install --require-hashes -r requirements.lock
           pip install -e . --no-deps --no-build-isolation
-          pip install cyclonedx-bom==4.6.1
+          # Hash-pinned CI-tool install (Scorecard Pinned-Dependencies).
+          pip install --require-hashes -r requirements-citools.lock
           cyclonedx-py environment -o sbom.cdx.json
           test -s sbom.cdx.json
 

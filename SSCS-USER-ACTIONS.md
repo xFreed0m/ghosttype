@@ -120,3 +120,102 @@ job (PR gate) no-ops without it.
 Once `release.yml` has produced a provenanced release, add the slsa.dev
 Build-Level badge to `README.md`. Not added now — asserting a SLSA level
 with no provenanced artifact would be a false claim.
+
+---
+
+# Code-Scanning Dashboard — Full Disposition (2026-05-16)
+
+Snapshot of every alert that was open on
+`https://github.com/p4gs/ghosttype/security/code-scanning` and exactly how
+each was handled. Three honest dispositions: **fixed in code**,
+**documented dismissal** (the constitutional carve-out — the scanner
+*fundamentally cannot model* the pattern, paired with a real residual-risk
+fix; never bare suppression), and **repo-admin / external** (cannot be fixed
+from code; faking it would be dishonest).
+
+| # | Tool | Rule | Location | Disposition |
+|---|------|------|----------|-------------|
+| 4,3,2 | Scorecard | PinnedDependenciesID | ci.yml:80,224,259 | **Fixed in code** — dropped unpinned `pip install --upgrade pip`; pip-audit/zizmor installed via `--require-hashes -r requirements-citools.lock` |
+| 6,5 | Scorecard | PinnedDependenciesID | release.yml:49,125 | **Fixed in code** — dropped `--upgrade pip`; cyclonedx-bom installed via `--require-hashes -r requirements-citools.lock` |
+| 13 | Opengrep | crypto-mode-without-authentication | chatgpt.py:96 | **Documented dismissal (needs your approval)** — see B-1 |
+| 12 | CodeQL | py/clear-text-storage-sensitive-data | report.py:52 | **Code-hardened + documented dismissal** — see B-2 |
+| 11 | CodeQL | py/clear-text-logging-sensitive-data | cli.py:314 | **Documented dismissal (needs your approval)** — see B-3 |
+| 1 | Scorecard | BranchProtectionID | main | **Repo-admin** — Action #1 (branch protection / ruleset) |
+| 7 | Scorecard | CIIBestPracticesID | — | **External** — Action #5 (register bestpractices.dev) |
+| 8 | Scorecard | CodeReviewID | — | **Process** — see C-note below |
+| 9 | Scorecard | FuzzingID | — | **Scope decision** — see C-note below |
+| 10 | Scorecard | MaintainedID | — | **Time-based / no action** — see C-note below |
+
+## Class B — by-design true-positives: full dismissal justification
+
+These are real code patterns, but the flagged behavior is the authorized
+tool's core function or an immutable third-party-format interop constraint
+the scanner cannot model. Per the zero-suppression rule, each dismissal is
+**evidence-based, documented, and (for B-2) paired with a real code fix** —
+not a bare "safe in practice" hand-wave. Inline annotations are retained.
+
+**B-1 — alert #13, `chatgpt.py:96`, AES-128-CBC (Opengrep):**
+ghosttype is a *read-only forensic reader*. ChatGPT Desktop wrote its
+`.data` files with AES-128-CBC via Electron `safeStorage` and a
+Keychain-derived key. ghosttype cannot author a message-authentication tag
+over ciphertext it did not produce, and switching to an AEAD mode would make
+real ChatGPT data permanently unreadable — defeating the tool's purpose.
+Opengrep cannot model "this is interop with a third party's immutable
+on-disk format." The inline `# nosemgrep:` annotation and documenting
+comment remain at `chatgpt.py:96`. Authorized-use-only (THREAT-MODEL.md).
+
+**B-2 — alert #12, `report.py:52`, clear-text storage (CodeQL):**
+ghosttype is an authorized-use-only forensic credential scanner. The
+discovered `secret_value` *is* the pentest/DLP report deliverable — the
+licensed operator needs the plaintext to locate and rotate the exposed
+credential. A credential scanner's report inherently contains credentials;
+CodeQL cannot model this authorized intent. **Real residual-risk fix shipped
+in code:** `report.py` now writes both JSON and CSV reports owner-only
+(`0600`, via `_secure_opener` + re-`chmod`), and `--redact` masks values
+when not needed. Removing the value would neuter the tool's core function.
+
+**B-3 — alert #11, `cli.py:314`, clear-text logging (CodeQL):**
+Same authorized deliverable, reached via the documented `--output -` stdout
+path (pipelining, e.g. `| jq`). The plaintext credential is the actionable
+output; `--redact` masks it when not required. CodeQL's clear-text-logging
+sink cannot model authorized forensic output. Documented evidence-based
+carve-out, not suppression of an exploitable defect.
+
+> **Action required (you / repo-admin):** dismissing alerts is an external
+> GitHub write, deliberately gated. Approve, then either dismiss in the
+> Security UI (Dismiss → "Won't fix", paste the matching B-note), or run:
+>
+> ```
+> gh api -X PATCH repos/p4gs/ghosttype/code-scanning/alerts/13 \
+>   -f state=dismissed -f dismissed_reason="won't fix" \
+>   -f dismissed_comment="By-design forensic interop; full rationale: SSCS-USER-ACTIONS.md B-1"
+> gh api -X PATCH repos/p4gs/ghosttype/code-scanning/alerts/12 \
+>   -f state=dismissed -f dismissed_reason="won't fix" \
+>   -f dismissed_comment="By-design authorized deliverable; report files now 0600; full rationale: B-2"
+> gh api -X PATCH repos/p4gs/ghosttype/code-scanning/alerts/11 \
+>   -f state=dismissed -f dismissed_reason="won't fix" \
+>   -f dismissed_comment="Same authorized deliverable via --output -; full rationale: B-3"
+> ```
+
+## Class C — posture findings (repo-admin / external / time-based)
+
+Not code defects. Fixing them from code is impossible; faking them would be
+dishonest. Mapped to the actions above plus:
+
+- **#1 BranchProtectionID** → **Action #1** (branch protection / no-admin-bypass
+  ruleset on `main`). The single highest-value remaining item.
+- **#7 CIIBestPracticesID** → **Action #5** (register at bestpractices.dev →
+  numeric ID → replace `BESTPRACTICES_ID` in README).
+- **#8 CodeReviewID** ("0/15 approved changesets") → resolves once changes
+  land via **reviewed pull requests** instead of direct pushes. This is a
+  process change, not a code change; it improves automatically as PR-merged
+  history accumulates. (The solo-maintainer hardening pushes so far are the
+  cause; no code can retroactively add reviews.)
+- **#9 FuzzingID** ("not fuzzed") → **scope decision:** ghosttype is a
+  forensic file/SQLite/JSONL parser — a fuzz harness (e.g. Atheris over the
+  scanner decoders) has genuine value and is a reasonable *future* feature,
+  but adding it is net-new feature work, not a security *remediation*, and
+  is deliberately **not faked** here. Tracked as a future enhancement.
+- **#10 MaintainedID** ("repository created in last 90 days") → **no action
+  possible or needed**: purely time-based. It clears automatically as the
+  project ages and accrues commit history; nothing in code influences it.

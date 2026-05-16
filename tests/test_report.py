@@ -100,3 +100,33 @@ def test_copy_sources_deduplicates_same_file(tmp_path, findings):
     copy_sources(doubled, sources_dir)
     copied = list((sources_dir / "claude_code").iterdir())
     assert len(copied) == 1
+
+
+def test_write_json_is_owner_only(tmp_path, findings):
+    out = tmp_path / "findings.json"
+    write_json(findings, out, redact=False)
+    assert out.stat().st_mode & 0o077 == 0
+
+
+def test_write_csv_is_owner_only(tmp_path, findings):
+    out = tmp_path / "findings.csv"
+    write_csv(findings, out, redact=False)
+    assert out.stat().st_mode & 0o077 == 0
+
+
+def test_report_perms_tightened_when_file_preexists_world_readable(
+    tmp_path, findings
+):
+    # A prior run may have left a world-readable report in place; the writers
+    # must re-restrict it, not inherit the looser mode.
+    j = tmp_path / "findings.json"
+    j.write_text("[]")
+    j.chmod(0o644)
+    write_json(findings, j, redact=False)
+    assert j.stat().st_mode & 0o077 == 0
+
+    c = tmp_path / "findings.csv"
+    c.write_text("stale")
+    c.chmod(0o644)
+    write_csv(findings, c, redact=False)
+    assert c.stat().st_mode & 0o077 == 0

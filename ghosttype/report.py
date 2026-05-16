@@ -3,10 +3,22 @@ from __future__ import annotations
 import csv
 import hashlib
 import json
+import os
 import shutil
 from pathlib import Path
 
 from ghosttype.models import Finding
+
+# Report files carry plaintext discovered credentials by design (the authorized
+# pentest/DLP deliverable; --redact masks them when not needed). They are still
+# written owner-only so the at-rest blast radius is the operator's account, not
+# the filesystem's default umask. Created restricted via the opener, and
+# re-restricted in case a prior run left a wider-mode file in place.
+_OWNER_ONLY = 0o600
+
+
+def _secure_opener(path: str, flags: int) -> int:
+    return os.open(path, flags, _OWNER_ONLY)
 
 _FIELDS = [
     "tool",
@@ -48,22 +60,28 @@ def _finding_to_dict(f: Finding, redact: bool = False) -> dict:
 def write_json(findings: list[Finding], path: Path, redact: bool = False) -> None:
     """Write findings to a JSON file (UTF-8, pretty-printed)."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps([_finding_to_dict(f, redact=redact) for f in findings], indent=2),
-        encoding="utf-8",
-    )
+    with open(path, "w", encoding="utf-8", opener=_secure_opener) as fh:
+        fh.write(
+            json.dumps(
+                [_finding_to_dict(f, redact=redact) for f in findings], indent=2
+            )
+        )
+    os.chmod(path, _OWNER_ONLY)
 
 
 def write_csv(findings: list[Finding], path: Path, redact: bool = False) -> None:
     """Write findings to a CSV file. `extra_data` is JSON-encoded into one cell."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    with path.open("w", newline="", encoding="utf-8") as fh:
+    with open(
+        path, "w", newline="", encoding="utf-8", opener=_secure_opener
+    ) as fh:
         writer = csv.DictWriter(fh, fieldnames=_FIELDS)
         writer.writeheader()
         for f in findings:
             row = _finding_to_dict(f, redact=redact)
             row["extra_data"] = json.dumps(row.get("extra_data") or {}, sort_keys=True)
             writer.writerow(row)
+    os.chmod(path, _OWNER_ONLY)
 
 
 def copy_sources(findings: list[Finding], sources_dir: Path) -> None:

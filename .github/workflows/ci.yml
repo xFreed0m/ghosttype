@@ -77,7 +77,10 @@ jobs:
       - name: Install dependencies (hashed closure)
         run: |
           set -euo pipefail
-          python -m pip install --upgrade pip
+          # No `pip install --upgrade pip`: that fetch is itself unpinned
+          # (Scorecard Pinned-Dependencies). The runner's pip ships with the
+          # SHA-pinned actions/setup-python above and already supports
+          # --require-hashes — one fewer unpinned network fetch is strictly safer.
           pip install --require-hashes -r requirements.lock
           pip install -e . --no-deps --no-build-isolation
 
@@ -221,7 +224,9 @@ jobs:
       - name: pip-audit (runtime + build closure)
         run: |
           set -euo pipefail
-          pip install pip-audit==2.7.3
+          # Hash-pinned CI-tool install (Scorecard Pinned-Dependencies):
+          # version-pin alone is not enough — the wheel bytes are verified.
+          pip install --require-hashes -r requirements-citools.lock
           pip-audit -r requirements.lock --strict
 
       # Dev-only tooling findings are advisory per ISA decision (DECISIONS.md):
@@ -256,7 +261,8 @@ jobs:
       - name: zizmor (pinned)
         run: |
           set -euo pipefail
-          pip install zizmor==1.25.2
+          # Hash-pinned CI-tool install (Scorecard Pinned-Dependencies).
+          pip install --require-hashes -r requirements-citools.lock
           zizmor --persona=regular .github/workflows/
 
   # PR-time dependency vuln + license gate. Requires the repo's Dependency
