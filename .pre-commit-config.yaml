@@ -21,3 +21,17 @@ repos:
       - id: check-yaml
       - id: check-added-large-files
       - id: detect-private-key
+
+  # GitHub Actions hygiene + security (the repo ships several workflows).
+  # actionlint = syntax/shellcheck; zizmor = supply-chain/dangerous-workflow.
+  # CI additionally enforces zizmor (workflow-security job) as the gate.
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      # defends: workflow syntax errors / unsafe shell in run: steps
+      - id: actionlint
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.25.2
+    hooks:
+      # defends: dangerous-workflow / template-injection / unpinned actions
+      - id: zizmor
