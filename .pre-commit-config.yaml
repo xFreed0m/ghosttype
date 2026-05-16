@@ -1,0 +1,23 @@
+# Pre-commit hooks for ghosttype.
+#
+# Deliberately minimal: secret scanning + safe whitespace/key hygiene only.
+# NO source-rewriting hooks (no black, no autopep8, no isort) — formatting is
+# not enforced here, and a rewriting hook in a forensic secret-scanner could
+# silently mutate fixture corpora.
+#
+# Install once locally with:  pre-commit install
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      # defends: committed-secret leak before it reaches the remote
+      - id: gitleaks
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: detect-private-key

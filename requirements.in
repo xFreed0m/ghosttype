@@ -1,0 +1,15 @@
+# SSCS hashed-closure source. Compile with:
+#   pip-compile --generate-hashes --output-file=requirements.lock requirements.in
+# Includes the build backend so CI can do `pip install -e . --no-build-isolation`.
+click>=8.0
+cryptography>=41.0
+rich>=13.0
+pytest>=8.0
+pytest-cov>=4.0
+hatchling
+# editables: required by hatchling's editable-install build path
+# (`pip install -e . --no-build-isolation`); NOT a declared hatchling install
+# dep, so it must be pinned explicitly or the CI install step fails with
+# ModuleNotFoundError: No module named 'editables'.
+editables
+build

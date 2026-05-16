@@ -83,7 +83,17 @@ class ChatGPTScanner(Scanner):
             key = pbkdf2_hmac("sha1", key_bytes, b"saltysalt", 1003, dklen=16)
             iv = b" " * 16
             ciphertext = raw[3:]
-            cipher = Cipher(algorithms.AES(key), modes.CBC(iv))
+            # SECURITY (SSCS B3, true-positive, evidence-based exception):
+            # semgrep flags AES-CBC-without-authentication. This is a forensic
+            # DECRYPTOR of Chromium/Electron OSCrypt files (ChatGPT app),
+            # whose on-disk scheme is fixed AES-128-CBC by Chromium's design.
+            # ghosttype did not encrypt this data and cannot add an auth tag;
+            # an authenticated mode (GCM) would simply fail to decrypt the
+            # target's existing files. Read-only, authorized-use forensic
+            # interop — the scanner cannot model "matching an external fixed
+            # format" vs "choosing a mode". Narrow line-scoped suppression,
+            # logged in the SSCS ISA ## Decisions (no global/path ignore).
+            cipher = Cipher(algorithms.AES(key), modes.CBC(iv))  # nosemgrep: python.cryptography.security.mode-without-authentication.crypto-mode-without-authentication
             decryptor = cipher.decryptor()
             padded = decryptor.update(ciphertext) + decryptor.finalize()
             unpadder = sym_padding.PKCS7(128).unpadder()
