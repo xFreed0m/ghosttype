@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/p4gs/ghosttype/actions/workflows/ci.yml/badge.svg)](https://github.com/p4gs/ghosttype/actions/workflows/ci.yml)
 [![coverage ≥95%](https://img.shields.io/badge/coverage-%E2%89%A595%25-brightgreen)](https://github.com/p4gs/ghosttype/actions/workflows/ci.yml)
-[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/p4gs/ghosttype/badge)](https://scorecard.dev/viewer/?uri=github.com/p4gs/ghosttype)
 [![Scorecard supply-chain](https://github.com/p4gs/ghosttype/actions/workflows/scorecard.yml/badge.svg)](https://github.com/p4gs/ghosttype/actions/workflows/scorecard.yml)
 [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/BESTPRACTICES_ID/badge)](https://www.bestpractices.dev/projects/BESTPRACTICES_ID)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
@@ -11,7 +10,7 @@
 SSCS decorators — REAL, KNOWN badges only. None are fabricated.
   CI / Scorecard supply-chain : native GitHub Actions workflow-status badges; live once the workflow runs on the default branch.
   coverage ≥95%               : NOT a fabricated number. It states the ENFORCED invariant — CI runs `pytest --cov-fail-under=95`, so a green build provably means coverage ≥95% (actual is higher, ~98%, but the guaranteed claim is the floor). A static "97%" would rot/become false; a live exact-% badge needs Codecov (excluded) or a CI self-publish job (offered separately). This gate badge is truthful, FOSS (shields.io static), zero-infra.
-  OpenSSF Scorecard           : official api.securityscorecards.dev badge; publish_results is now TRUE in scorecard.yml — the badge populates with the real score after the next scheduled/push Scorecard run publishes to the public OpenSSF API.
+  OpenSSF Scorecard (score)   : REMOVED. The api.securityscorecards.dev score badge is structurally impossible on a fork — the OpenSSF webapp rejects fork publishing (HTTP 400, "Fork repository: true") and `publish_results: true` then FAILS the scorecard workflow. It is NOT "pending activation"; it can only ever work if this stops being a fork. The Scorecard *workflow* still runs (SARIF → code-scanning); the "Scorecard supply-chain" workflow-status badge above reflects that truthfully. Removed rather than show a permanently-broken "invalid repo path" badge.
   OpenSSF Best Practices      : official bestpractices.dev badge; the URL needs a numeric project ID from registering the project. BESTPRACTICES_ID is a placeholder, NOT a fabricated value — replace after registering (SSCS-USER-ACTIONS.md). Until then this badge intentionally shows as broken rather than show a fake score.
   pre-commit                  : the project's own recognized badge; live immediately.
 The gitleaks badge was REMOVED because gitleaks is no longer used anywhere — the pre-commit cred scanner is now TruffleHog (broader detector coverage + active verification). Keeping a "protected by gitleaks" badge would be a false claim.

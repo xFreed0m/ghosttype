@@ -44,12 +44,12 @@ jobs:
         with:
           results_file: results.sarif
           results_format: sarif
-          # Publishes this repo's Scorecard results to the public OpenSSF
-          # API (api.securityscorecards.dev) so the README score badge
-          # populates. Enabled by owner decision (repo is public; the job
-          # has id-token: write). Note: this pushes THIS fork's results to
-          # the shared public dataset under github.com/p4gs/ghosttype.
-          publish_results: true
+          # MUST stay false on a fork: the OpenSSF webapp rejects fork
+          # publishing (HTTP 400, "Fork repository: true") and the action
+          # then exits non-zero, failing this workflow. The score badge is
+          # therefore structurally unavailable while this repo is a fork —
+          # only achievable if it becomes a non-fork/standalone repo.
+          publish_results: false
 
       - name: Upload artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
