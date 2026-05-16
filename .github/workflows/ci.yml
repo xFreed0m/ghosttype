@@ -208,10 +208,12 @@ jobs:
           # SHA256SUMS lists every platform asset; we fetched only one.
           sha256sum --ignore-missing -c osv-scanner_SHA256SUMS
           chmod +x osv-scanner_linux_amd64
-          # osv-scanner v2 CLI: `scan source -r <dir>` (auto-discovers
-          # requirements.lock etc.). v1 flags --recursive/--skip-git/
-          # --lockfile were removed/renamed in v2.
-          ./osv-scanner_linux_amd64 scan source -r .
+          # `requirements.lock` is a non-standard filename, so auto-discovery
+          # ("scan source -r ." -> "No package sources found", exit 128)
+          # misses it. osv-scanner v2 explicit form: --lockfile
+          # '<parse-as>:<path>' — parse it AS pip requirements.txt format
+          # (sourced: osv-scanner docs/scan-source.md).
+          ./osv-scanner_linux_amd64 scan source --lockfile 'requirements.txt:requirements.lock'
 
       # Gate on vulnerabilities in the runtime/build closure. --strict makes
       # any audit warning (e.g. a package with no known-vuln data) fail too.
