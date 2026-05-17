@@ -14,8 +14,8 @@ from rich.table import Table
 
 from ghosttype.models import Finding
 from ghosttype.report import (
-    _finding_to_dict,
     copy_sources as copy_sources_fn,
+    finding_to_dict,
     write_csv,
     write_json,
 )
@@ -195,6 +195,17 @@ def scan(
     By default both engines run: TruffleHog (verified, structural) and the
     in-tree regex/heuristic patterns (offline, complementary). See --engine.
     """
+    if only_verified and no_verification:
+        # Both set => TruffleHog gets --no-verification (every finding marked
+        # unverified) AND --results=verified (drops every unverified finding).
+        # Net: an unconditional empty result with exit 0 — a silent false
+        # "all clear". Refuse the combination instead of lying.
+        raise click.UsageError(
+            "--only-verified and --no-verification are mutually exclusive: "
+            "--no-verification marks every finding unverified, then "
+            "--only-verified filters them all out (a silent false negative)."
+        )
+
     if verbose:
         import logging
         logging.basicConfig(level=logging.INFO, format="[ghosttype] %(message)s")
@@ -300,7 +311,7 @@ def scan(
         # string — so `ghosttype scan --output - | jq` never breaks.
         # Single serializer (report._finding_to_dict) so stdout, JSON file
         # and CSV share one schema AND one redaction policy.
-        data = [_finding_to_dict(f, redact=redact) for f in findings]
+        data = [finding_to_dict(f, redact=redact) for f in findings]
         sys.stdout.write(json.dumps(data, indent=2))
         sys.stdout.write("\n")
     elif findings:

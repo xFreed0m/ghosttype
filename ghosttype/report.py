@@ -63,7 +63,10 @@ def _scrub(obj, secret: str):
     return obj
 
 
-def _finding_to_dict(f: Finding, redact: bool = False) -> dict:
+def finding_to_dict(f: Finding, redact: bool = False) -> dict:
+    """Serialize a Finding to the report dict. Public serialization API —
+    stdout, JSON file, and CSV all go through this so the schema and the
+    --redact policy are defined in exactly one place."""
     return {
         "tool": f.tool,
         "source": f.source,
@@ -71,7 +74,15 @@ def _finding_to_dict(f: Finding, redact: bool = False) -> dict:
         "detector_name": f.detector_name,
         "severity": f.severity,
         "verified": f.verified,
-        "verification_error": f.verification_error,
+        # TruffleHog's live verifier echoes provider API error bodies here,
+        # and some providers include the submitted token verbatim
+        # (e.g. "invalid token 'ghp_…'"). --redact must scrub it like every
+        # other field or a "redacted" report still leaks the credential.
+        "verification_error": (
+            _scrub(f.verification_error, f.secret_value)
+            if redact
+            else f.verification_error
+        ),
         "secret_value": _REDACTED if redact else f.secret_value,
         "file_path": str(f.file_path),
         "position": f.position,
@@ -84,13 +95,20 @@ def _finding_to_dict(f: Finding, redact: bool = False) -> dict:
     }
 
 
+# Back-compat alias. The underscore name was the historical import path
+# (cli.py, tests). `finding_to_dict` is now the public contract; keep the
+# old name bound to it so a future report.py refactor can't silently break
+# external callers.
+_finding_to_dict = finding_to_dict
+
+
 def write_json(findings: list[Finding], path: Path, redact: bool = False) -> None:
     """Write findings to a JSON file (UTF-8, pretty-printed)."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8", opener=_secure_opener) as fh:
         fh.write(
             json.dumps(
-                [_finding_to_dict(f, redact=redact) for f in findings], indent=2
+                [finding_to_dict(f, redact=redact) for f in findings], indent=2
             )
         )
     os.chmod(path, _OWNER_ONLY)
@@ -105,7 +123,7 @@ def write_csv(findings: list[Finding], path: Path, redact: bool = False) -> None
         writer = csv.DictWriter(fh, fieldnames=_FIELDS)
         writer.writeheader()
         for f in findings:
-            row = _finding_to_dict(f, redact=redact)
+            row = finding_to_dict(f, redact=redact)
             row["extra_data"] = json.dumps(row.get("extra_data") or {}, sort_keys=True)
             writer.writerow(row)
     os.chmod(path, _OWNER_ONLY)

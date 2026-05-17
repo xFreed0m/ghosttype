@@ -134,6 +134,16 @@ def _build_argv(
     concurrency: int,
     detector_timeout: str,
 ) -> list[str]:
+    # Defense-in-depth for programmatic callers (the CLI guards this too, but
+    # scan_chunks/_build_argv is a public entrypoint). verify=False emits
+    # --no-verification; only_verified=True emits --results=verified; together
+    # they filter out every finding and exit 0 — a silent false "all clear".
+    if not verify and only_verified:
+        raise ValueError(
+            "only_verified=True is incompatible with verify=False: "
+            "--no-verification marks every finding unverified and "
+            "--results=verified then drops them all."
+        )
     argv: list[str] = [
         binary,
         "filesystem",
@@ -326,15 +336,32 @@ def scan_chunks(
                 )
             )
 
-        if proc.returncode not in (0, 183) and not findings:
-            # 0 = success no findings, 183 = trufflehog's "findings present" exit
-            # (when --fail is set; we don't pass --fail but tolerate it).
+        if proc.returncode not in (0, 183):
+            # 0 = success no findings, 183 = trufflehog's "findings present"
+            # exit (when --fail is set; we don't pass --fail but tolerate it).
             stderr_tail = (proc.stderr or "").strip().splitlines()[-10:]
-            raise TruffleHogExecutionError(
-                "trufflehog exited "
-                f"{proc.returncode} with no findings.\n"
-                f"argv: {' '.join(argv)}\n"
-                f"stderr (tail): {chr(10).join(stderr_tail)}"
+            if not findings:
+                raise TruffleHogExecutionError(
+                    "trufflehog exited "
+                    f"{proc.returncode} with no findings.\n"
+                    f"argv: {' '.join(argv)}\n"
+                    f"stderr (tail): {chr(10).join(stderr_tail)}"
+                )
+            # Findings WERE emitted but the process still failed (e.g. a
+            # permission error part-way through the corpus). Previously the
+            # `and not findings` guard swallowed this: a partial scan was
+            # returned indistinguishably from a clean, complete one — the
+            # worst failure mode for a secret scanner. Make it loud. The
+            # logger has no handler by default, so this reaches stderr via
+            # logging.lastResort even without --verbose.
+            logger.warning(
+                "trufflehog exited %d AFTER emitting %d finding(s) — the scan "
+                "is PARTIAL and may have missed credentials in unscanned "
+                "files. argv: %s | stderr (tail): %s",
+                proc.returncode,
+                len(findings),
+                " ".join(argv),
+                " / ".join(stderr_tail),
             )
         return findings
     finally:

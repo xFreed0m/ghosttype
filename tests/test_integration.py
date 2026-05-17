@@ -1,11 +1,19 @@
-"""End-to-end test: real trufflehog binary over synthetic conversation files.
+"""End-to-end tests over synthetic conversation files.
 
-Skipped automatically when `trufflehog` is not on PATH. All credentials below
-are obviously-fake and crafted to match TruffleHog's structural patterns but
-WILL fail live verification (they aren't real). The integration test asserts:
+Most tests drive the real `trufflehog` binary and are skipped automatically
+when it is not on PATH (`@requires_trufflehog`). All credentials below are
+obviously-fake and crafted to match TruffleHog's structural patterns but WILL
+fail live verification (they aren't real). These assert:
 
   - the engine produces a Finding for the planted secret
   - the discovery layer correctly hands the right ConversationRecord
+
+One test is deliberately NOT trufflehog-gated:
+`test_end_to_end_cursor_pattern_engine_finds_connection_string` exercises the
+`--engine patterns` path (Cursor -> orchestrator -> in-tree pattern engine)
+for a `connection_string` — a type only the pattern engine detects. It is the
+regression guard for the pattern-engine-only e2e coverage that existed in
+v0.2.0 and was dropped in commit fa16b0c when TruffleHog became primary.
 """
 from __future__ import annotations
 
@@ -85,6 +93,68 @@ def synthetic_cursor_dir(tmp_path) -> Path:
         )
         conn.commit()
     return tmp_path
+
+
+@pytest.fixture
+def synthetic_cursor_connstring_dir(tmp_path) -> Path:
+    """Cursor corpus planting a DB connection string — a type the in-tree
+    pattern engine detects but TruffleHog does NOT. Used to drive the
+    pattern-engine-only path with no trufflehog binary present."""
+    db_path = tmp_path / "state.vscdb"
+    with closing(sqlite3.connect(db_path)) as conn:
+        conn.execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value TEXT)")
+        conn.execute(
+            "INSERT INTO cursorDiskKV VALUES (?, ?)",
+            (
+                "composerData:conn-uuid",
+                json.dumps(
+                    {
+                        "composerId": "conn-uuid",
+                        "text": (
+                            "DATABASE_URL="
+                            "postgresql://svc:s3cr3tPlaceholder@db.internal:5432/prod"
+                        ),
+                        "conversationMap": {},
+                        "createdAt": 1704067200000,
+                    }
+                ),
+            ),
+        )
+        conn.commit()
+    return tmp_path
+
+
+def test_end_to_end_cursor_pattern_engine_finds_connection_string(
+    synthetic_cursor_connstring_dir,
+):
+    """Pattern-engine-only e2e (NO trufflehog binary needed). Cursor scanner
+    -> orchestrator -> in-tree pattern engine still surfaces a DB connection
+    string. Regression guard for the coverage dropped in commit fa16b0c."""
+    scanner = CursorScanner()
+    with patch.object(
+        type(scanner),
+        "_db_path",
+        new_callable=PropertyMock,
+        return_value=synthetic_cursor_connstring_dir / "state.vscdb",
+    ), patch.object(
+        type(scanner),
+        "_base_path",
+        new_callable=PropertyMock,
+        return_value=synthetic_cursor_connstring_dir,
+    ):
+        orch = Orchestrator(scanners=[scanner], engine="patterns")
+        findings = orch.run()
+
+    assert any(f.secret_type == "connection_string" for f in findings)
+    conn = next(f for f in findings if f.secret_type == "connection_string")
+    assert conn.tool == "cursor"
+    assert conn.secret_value.startswith("postgresql://")
+    # Pattern-engine hits are never verified, and under the unified severity
+    # scheme a non-critical-class type is `medium` (was `high`/`critical`
+    # before the cross-engine alignment).
+    assert conn.verified is False
+    assert conn.severity == "medium"
+    assert conn.source != "trufflehog"
 
 
 @requires_trufflehog

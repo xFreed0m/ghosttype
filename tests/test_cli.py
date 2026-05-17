@@ -300,3 +300,51 @@ def test_scan_stdout_redacts_secret_everywhere(tmp_path):
     assert payload[0]["secret_value"] == "***REDACTED***"
     assert "***REDACTED***" in payload[0]["context"]
     assert payload[0]["extra_data"]["harmless"] == "keep"
+
+
+def test_scan_only_verified_plus_no_verification_is_rejected(tmp_path, monkeypatch):
+    """The combination silently filtered out every finding and exited 0 — a
+    false 'all clear'. It must now be refused up front (issue #3)."""
+    _patch_binary(monkeypatch)
+    runner = CliRunner()
+    with patch("ghosttype.cli.Orchestrator") as MockOrch:
+        result = runner.invoke(
+            cli,
+            ["scan", "--only-verified", "--no-verification",
+             "--output", str(tmp_path / "r")],
+        )
+    # click.UsageError -> exit code 2, and the scan never reached the engine.
+    assert result.exit_code == 2
+    assert "mutually exclusive" in result.output
+    MockOrch.return_value.run.assert_not_called()
+
+
+def test_scan_only_verified_alone_still_works(tmp_path, monkeypatch):
+    """Guard must not over-trigger: each flag on its own is still valid."""
+    _patch_binary(monkeypatch)
+    runner = CliRunner()
+    with patch("ghosttype.cli.Orchestrator") as MockOrch:
+        MockOrch.return_value.run.return_value = []
+        MockOrch.return_value.files_scanned = 0
+        result = runner.invoke(
+            cli, ["scan", "--only-verified", "--output", str(tmp_path / "r")]
+        )
+    assert result.exit_code == 0
+    MockOrch.return_value.run.assert_called_once()
+
+
+def test_engine_build_argv_rejects_no_verify_with_only_verified():
+    """Defense-in-depth for programmatic callers that bypass the CLI guard."""
+    import pytest
+
+    from ghosttype.trufflehog_engine import _build_argv
+
+    with pytest.raises(ValueError, match="incompatible"):
+        _build_argv(
+            "trufflehog",
+            Path("/tmp"),
+            verify=False,
+            only_verified=True,
+            concurrency=10,
+            detector_timeout="10s",
+        )

@@ -155,3 +155,50 @@ def test_redact_false_leaves_context_and_extra_data_intact(tmp_path, findings):
     data = json.loads(out.read_text())
     assert data[0]["secret_value"] == "AKIA00000000000000000"
     assert "AKIA00000000000000000" in data[0]["context"]
+
+
+def test_redact_scrubs_secret_from_verification_error(tmp_path, findings):
+    """TruffleHog's live verifier echoes provider API error bodies into
+    verification_error, and some providers include the submitted token
+    verbatim. --redact must scrub it there too, or a 'redacted' report still
+    leaks the credential."""
+    f = findings[0]
+    f.verification_error = (
+        "provider rejected token 'AKIA00000000000000000': 403 Forbidden"
+    )
+    out = tmp_path / "findings.json"
+    write_json([f], out, redact=True)
+    blob = out.read_text()
+    assert "AKIA00000000000000000" not in blob
+    data = json.loads(blob)
+    assert "***REDACTED***" in data[0]["verification_error"]
+    assert "403 Forbidden" in data[0]["verification_error"]
+
+
+def test_redact_false_leaves_verification_error_intact(tmp_path, findings):
+    f = findings[0]
+    f.verification_error = "token 'AKIA00000000000000000' invalid"
+    out = tmp_path / "findings.json"
+    write_json([f], out, redact=False)
+    data = json.loads(out.read_text())
+    assert data[0]["verification_error"] == "token 'AKIA00000000000000000' invalid"
+
+
+def test_redact_handles_none_verification_error(tmp_path, findings):
+    """The common case: no verification error. Scrub must pass None through
+    untouched (not crash, not stringify)."""
+    f = findings[0]
+    f.verification_error = None
+    out = tmp_path / "findings.json"
+    write_json([f], out, redact=True)
+    data = json.loads(out.read_text())
+    assert data[0]["verification_error"] is None
+
+
+def test_public_finding_to_dict_is_exported_and_aliased():
+    """report.finding_to_dict is the public serialization API; the historical
+    underscore name stays bound to it for back-compat (issue #13)."""
+    from ghosttype import report
+
+    assert hasattr(report, "finding_to_dict")
+    assert report._finding_to_dict is report.finding_to_dict

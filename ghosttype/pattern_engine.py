@@ -22,9 +22,13 @@ from ghosttype.patterns import scan_text
 
 DEFAULT_CONTEXT_WINDOW = 200
 
-# Same critical-type set the original v0.2.0 orchestrator used. A pattern hit
-# of one of these types is `high` severity even though it's unverifiable;
-# everything else regex/heuristic is `medium`.
+# Critical-class credential types. Pattern-engine hits are NEVER verified
+# (the in-tree engine does no live check), so they follow TruffleHog's
+# *unverified* severity scheme for cross-engine consistency: a hit of one of
+# these types is `high`, everything else is `medium`. `critical` is reserved
+# for VERIFIED critical-class detectors — a state the pattern engine cannot
+# reach — so the two engines now agree on the label for the same unverified
+# credential type (see trufflehog_engine._severity_for).
 _HIGH_SEVERITY_TYPES = frozenset({
     "aws_access_key",
     "anthropic_key",
@@ -41,9 +45,12 @@ _HIGH_SEVERITY_TYPES = frozenset({
 
 
 def _severity_for(secret_type: str, confidence: str) -> str:
-    if secret_type in _HIGH_SEVERITY_TYPES:
-        return "critical"
-    return "high" if confidence == "high" else "medium"
+    # `confidence` is kept in the signature for caller compatibility but is
+    # intentionally unused: the unverified scheme does not branch on it, which
+    # is exactly what makes it consistent with trufflehog_engine._severity_for
+    # for the unverified case.
+    del confidence
+    return "high" if secret_type in _HIGH_SEVERITY_TYPES else "medium"
 
 
 def scan_chunks(

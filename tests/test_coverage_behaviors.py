@@ -49,7 +49,12 @@ def test_pattern_engine_skips_whitespace_only_chunks(tmp_path):
 
 
 def test_pattern_engine_high_severity_for_critical_type(tmp_path):
-    """A regex hit of a critical type (github_pat_classic) -> severity critical."""
+    """A regex hit of a critical-class type (github_pat_classic) -> severity
+    'high'. Pattern hits are inherently unverified, so they follow
+    TruffleHog's *unverified* scheme: critical-class -> high (never
+    'critical', which is reserved for verified critical-class detectors).
+    This makes the two engines agree on the label for the same unverified
+    credential type."""
     rec = _rec(tmp_path)
     chunk = TextChunk(
         text="token=ghp_a1b2c3D4e5F6g7H8i9J0k1L2m3N4o5P6q7R8",
@@ -58,14 +63,22 @@ def test_pattern_engine_high_severity_for_critical_type(tmp_path):
     )
     findings = pattern_engine.scan_chunks("claude_code", [chunk])
     assert any(
-        f.secret_type == "github_pat_classic" and f.severity == "critical"
+        f.secret_type == "github_pat_classic" and f.severity == "high"
         for f in findings
+    )
+    # And never 'critical' from the (always-unverified) pattern engine.
+    assert all(
+        f.severity != "critical"
+        for f in findings
+        if f.secret_type == "github_pat_classic"
     )
 
 
-def test_pattern_engine_non_critical_high_confidence_is_high(tmp_path):
-    """connection_string is a regex (high-confidence) hit but NOT in the
-    critical set -> severity 'high' (exercises the non-critical branch)."""
+def test_pattern_engine_non_critical_type_is_medium(tmp_path):
+    """connection_string is a regex hit NOT in the critical-class set. Under
+    the unified unverified scheme it is 'medium' regardless of the regex's
+    own confidence (the scheme no longer branches on confidence — that is
+    exactly what makes it consistent with trufflehog_engine._severity_for)."""
     rec = _rec(tmp_path)
     chunk = TextChunk(
         text="db=postgresql://admin:S3cr3tPass@db.example.com:5432/prod",
@@ -74,7 +87,7 @@ def test_pattern_engine_non_critical_high_confidence_is_high(tmp_path):
     )
     findings = pattern_engine.scan_chunks("claude_code", [chunk])
     conn = [f for f in findings if f.secret_type == "connection_string"]
-    assert conn and conn[0].severity == "high"
+    assert conn and conn[0].severity == "medium"
     assert conn[0].source == SOURCE_PATTERN
     assert conn[0].verified is False
 
