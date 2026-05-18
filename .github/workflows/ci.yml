@@ -189,6 +189,18 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
 
+      # Shallow checkout (depth 1) doesn't contain the base commit, so
+      # --baseline-commit fails with "git cat-file -e <sha>" not found.
+      # Fetch only the one commit we need — avoids a full unshallow.
+      - name: Fetch Opengrep baseline commit
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ -n "$BASE_SHA" ]; then
+            git fetch --depth=1 origin "$BASE_SHA"
+          fi
+
       - name: Opengrep SAST (pinned + Cosign-verified)
         env:
           # Passed via env, NOT interpolated into the script: an attacker-
