@@ -189,24 +189,11 @@ jobs:
       - name: Install Cosign
         uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
 
-      # Shallow checkout (depth 1) doesn't contain the base commit, so
-      # --baseline-commit fails with "git cat-file -e <sha>" not found.
-      # Fetch only the one commit we need — avoids a full unshallow.
-      - name: Fetch Opengrep baseline commit
-        if: github.event_name == 'pull_request'
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
-        run: |
-          if [ -n "$BASE_SHA" ]; then
-            git fetch --depth=1 origin "$BASE_SHA"
-          fi
-
       - name: Opengrep SAST (pinned + Cosign-verified)
         env:
           # Passed via env, NOT interpolated into the script: an attacker-
           # controlled PR base ref must not be able to inject shell. This is
           # the fix for zizmor's template-injection finding.
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           # Immutable commit for opengrep v1.21.0. raw.githubusercontent.com
           # serves whatever a ref currently points at, and a tag can be
           # force-pushed — so the script is pinned by commit SHA AND verified
@@ -225,10 +212,10 @@ jobs:
           bash /tmp/opengrep-install.sh -v v1.21.0 --verify-signatures
           export PATH="$HOME/.opengrep/cli/latest:$PATH"
           opengrep --version
-          # Scale: on a pull_request, scan ONLY code changed vs the base
-          # (--baseline-commit); on push BASE_SHA is empty -> full scan.
+          # Full scan on every run. --baseline-commit requires merge-base
+          # history that a shallow clone does not have, and scanning the full
+          # codebase is strictly more thorough for a security gate anyway.
           opengrep scan --config p/python --severity ERROR --error \
-            ${BASE_SHA:+--baseline-commit "$BASE_SHA"} \
             --jobs "$(nproc)" --sarif-output=opengrep.sarif .
 
       - name: Upload Opengrep SARIF
