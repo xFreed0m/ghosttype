@@ -1,0 +1,14 @@
+# Paths excluded from Opengrep's SAST scan (Opengrep honors .semgrepignore).
+# Mirrors .gitignore intent for the scanner: test fixtures are an
+# INTENTIONAL fake-credential corpus (this is a forensic scanner), and
+# vendor/output/build dirs are not first-party source.
+tests/fixtures/
+.venv/
+ghosttype_report/
+*.findings.json
+*.findings.csv
+build/
+dist/
+.git/
+__pycache__/
+.pytest_cache/

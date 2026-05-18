@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -34,7 +35,12 @@ class CodexScanner(Scanner):
             return []
         records: list[ConversationRecord] = []
         try:
-            with sqlite3.connect(f"file:{state_db}?mode=ro", uri=True) as conn:
+            # contextlib.closing: `with sqlite3.connect(...)` manages the
+            # transaction, not the connection lifetime. Without closing()
+            # the handle leaks until GC (ResourceWarning under -W error).
+            with closing(
+                sqlite3.connect(f"file:{state_db}?mode=ro", uri=True)
+            ) as conn:
                 rows = conn.execute(
                     "SELECT id, title, first_user_message, created_at FROM threads"
                 ).fetchall()
@@ -79,7 +85,9 @@ class CodexScanner(Scanner):
         logs_db = self._logs_db()
         if logs_db.exists():
             try:
-                with sqlite3.connect(f"file:{logs_db}?mode=ro", uri=True) as conn:
+                with closing(
+                    sqlite3.connect(f"file:{logs_db}?mode=ro", uri=True)
+                ) as conn:
                     # thread_id is stored in logs via thread_id column if present
                     # Try with thread_id filter; if column doesn't exist, skip
                     try:

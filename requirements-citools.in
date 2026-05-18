@@ -1,0 +1,8 @@
+# SSCS CI-only tooling — hash-pinned closure, INSTALLED SEPARATELY from the
+# runtime/build closure (requirements.lock) so CI tool installs are pinned by
+# hash (Scorecard Pinned-Dependencies). Compile with:
+#   pip-compile --generate-hashes --output-file=requirements-citools.lock requirements-citools.in
+# These tools never ship to users; they run only in CI jobs.
+pip-audit==2.7.3
+zizmor==1.25.2
+cyclonedx-bom==4.6.1

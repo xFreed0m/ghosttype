@@ -1,0 +1,47 @@
+# Pre-commit hooks for ghosttype.
+#
+# Deliberately minimal: secret scanning + safe whitespace/key hygiene only.
+# NO source-rewriting hooks (no black, no autopep8, no isort) — formatting is
+# not enforced here, and a rewriting hook in a forensic secret-scanner could
+# silently mutate fixture corpora.
+#
+# Install once locally with:  pre-commit install
+repos:
+  # TruffleHog is the cred scanner: far broader detector coverage than
+  # gitleaks AND it actively verifies findings (live/unknown/unverified)
+  # so real, exploitable secrets are prioritized over noise. Same engine
+  # ghosttype itself uses. Default hook entry scans the working changes
+  # with --results=verified --fail.
+  - repo: https://github.com/trufflesecurity/trufflehog
+    # Commit SHA, NOT a tag: a tag is mutable (can be force-pushed) and the
+    # PR applies SHA-pinning discipline everywhere. This SHA IS v3.94.3 —
+    # the exact version CI installs + sha256-verifies (ci.yml
+    # TRUFFLEHOG_VERSION) — so local pre-commit and CI run the same engine.
+    # Bump in lockstep with ci.yml's TRUFFLEHOG_VERSION.
+    rev: 47e7b7cd74f578e1e3145d48f669f22fd1330ca6  # v3.94.3
+    hooks:
+      # defends: committed-secret leak before it reaches the remote
+      - id: trufflehog
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: detect-private-key
+
+  # GitHub Actions hygiene + security (the repo ships several workflows).
+  # actionlint = syntax/shellcheck; zizmor = supply-chain/dangerous-workflow.
+  # CI additionally enforces zizmor (workflow-security job) as the gate.
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      # defends: workflow syntax errors / unsafe shell in run: steps
+      - id: actionlint
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.25.2
+    hooks:
+      # defends: dangerous-workflow / template-injection / unpinned actions
+      - id: zizmor

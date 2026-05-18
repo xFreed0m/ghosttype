@@ -1,0 +1,24 @@
+version: 2
+
+updates:
+  # Keep every SHA-pinned GitHub Action current. Dependabot rewrites the pin
+  # to the new SHA and annotates the version, preserving SHA-pinning.
+  # defends: stale action pin missing an upstream security fix
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"
+
+  # Python deps. Dependabot reads pyproject.toml for constraints and updates
+  # requirements.lock (the hashed closure) alongside it.
+  # defends: known-CVE dependency lingering in the shipped closure
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "deps"

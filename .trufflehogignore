@@ -1,0 +1,7 @@
+# Paths excluded from ghosttype's own self secret-scan (see ci.yml).
+# These contain INTENTIONAL fake credentials: this is a secret scanner, its
+# test corpus and its own JSON/CSV findings output are not real leaks.
+tests/fixtures/
+ghosttype_report/
+*.findings.json
+*.findings.csv

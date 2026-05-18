@@ -158,3 +158,109 @@ def test_extract_text_from_task_json(tmp_path):
     assert len(chunks) == 1
     assert chunks[0].position == "task:0"
     assert "ghp_RpQs7vXzBnCkDmWjEtFuGhYi12345678901234" in chunks[0].text
+
+
+# ----------------------------------------------------------------------
+# Drop-surface tests added after the v0.3.0 audit found that thinking /
+# tool_use / attachment / system / file-history-snapshot records were
+# silently being dropped by the extractor. These tests pin each case
+# so the regression cannot recur.
+# ----------------------------------------------------------------------
+
+def _make_session(tmp_path, lines):
+    """Helper: write a JSONL session file and return a discover record for it."""
+    import json
+    from ghosttype.models import ConversationRecord
+    from datetime import datetime, timezone
+
+    path = tmp_path / "audit-session.jsonl"
+    path.write_text("\n".join(json.dumps(l) for l in lines) + "\n")
+    return ConversationRecord(
+        source_path=path,
+        tool="claude_code",
+        conversation_id="audit",
+        created_at=datetime.now(timezone.utc),
+        raw=None,
+    )
+
+
+def test_thinking_blocks_are_extracted(tmp_path):
+    """An assistant `thinking` block must be mined (the v0.2/0.3 silent leak)."""
+    rec = _make_session(tmp_path, [
+        {"type": "assistant", "message": {"content": [
+            {"type": "thinking", "thinking": "user pasted TOKEN=ghp_inThinking01"}
+        ]}}
+    ])
+    chunks = ClaudeCodeScanner().extract_text(rec)
+    assert any("ghp_inThinking01" in c.text for c in chunks), (
+        "thinking blocks are silently dropped"
+    )
+
+
+def test_tool_use_input_is_extracted(tmp_path):
+    """tool_use blocks carry credentials in their .input dict (e.g. bash cmds)."""
+    rec = _make_session(tmp_path, [
+        {"type": "assistant", "message": {"content": [
+            {"type": "tool_use", "name": "Bash",
+             "input": {"command": "curl -H 'Authorization: Bearer ghp_inToolUse02' https://api.github.com"}}
+        ]}}
+    ])
+    chunks = ClaudeCodeScanner().extract_text(rec)
+    assert any("ghp_inToolUse02" in c.text for c in chunks), (
+        "tool_use.input fields are silently dropped"
+    )
+
+
+def test_attachment_records_are_extracted(tmp_path):
+    """Top-level attachment records must be processed."""
+    rec = _make_session(tmp_path, [
+        {"type": "attachment",
+         "attachment": {"text": "GITHUB_TOKEN=ghp_inAttachment03",
+                        "kind": "clipboard-paste"}}
+    ])
+    chunks = ClaudeCodeScanner().extract_text(rec)
+    assert any("ghp_inAttachment03" in c.text for c in chunks), (
+        "attachment records are silently dropped"
+    )
+
+
+def test_system_records_are_extracted(tmp_path):
+    """system records carry hook output / tool errors / compact metadata."""
+    rec = _make_session(tmp_path, [
+        {"type": "system",
+         "subtype": "tool_error",
+         "content": "command failed: API_KEY=sk-inSystemRecord04 is invalid"}
+    ])
+    chunks = ClaudeCodeScanner().extract_text(rec)
+    assert any("sk-inSystemRecord04" in c.text for c in chunks), (
+        "system records are silently dropped"
+    )
+
+
+def test_file_history_snapshot_records_are_extracted(tmp_path):
+    """file-history-snapshot records can contain the contents of .env files."""
+    rec = _make_session(tmp_path, [
+        {"type": "file-history-snapshot",
+         "snapshot": {"path": "/proj/.env",
+                      "before": "DB_URL=postgresql://u:p@db/x",
+                      "after": "DB_URL=postgresql://admin:Sn4pH1stP4ssw0rd05@db/prod"}}
+    ])
+    chunks = ClaudeCodeScanner().extract_text(rec)
+    assert any("Sn4pH1stP4ssw0rd05" in c.text for c in chunks), (
+        "file-history-snapshot records are silently dropped"
+    )
+
+
+def test_bookkeeping_records_remain_skipped(tmp_path):
+    """queue-operation / last-prompt / permission-mode / ai-title / pr-link
+    carry no payload that warrants per-line chunks; they should still be skipped
+    so we don't pay TruffleHog cost for empty content."""
+    rec = _make_session(tmp_path, [
+        {"type": "queue-operation"},
+        {"type": "last-prompt"},
+        {"type": "permission-mode", "permissionMode": "default"},
+        {"type": "ai-title", "title": "some chat"},
+        {"type": "pr-link", "url": "https://github.com/x/y/pull/1"},
+    ])
+    chunks = ClaudeCodeScanner().extract_text(rec)
+    assert chunks == [], f"expected no chunks for bookkeeping types, got: {chunks!r}"

@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -15,31 +16,29 @@ def codex_dir(tmp_path) -> Path:
 
     # state_5.sqlite: threads table
     state_db = codex / "state_5.sqlite"
-    conn = sqlite3.connect(state_db)
-    conn.execute("""
-        CREATE TABLE threads (
-            id TEXT PRIMARY KEY,
-            title TEXT,
-            first_user_message TEXT,
-            model TEXT,
-            cwd TEXT,
-            created_at INTEGER,
-            updated_at INTEGER
+    with closing(sqlite3.connect(state_db)) as conn:
+        conn.execute("""
+            CREATE TABLE threads (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                first_user_message TEXT,
+                model TEXT,
+                cwd TEXT,
+                created_at INTEGER,
+                updated_at INTEGER
+            )
+        """)
+        conn.execute(
+            "INSERT INTO threads VALUES (?,?,?,?,?,?,?)",
+            ("thread-abc", "Test session", "my token is ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456789012", "gpt-4o", "/tmp/proj", 1704067200, 1704067260),
         )
-    """)
-    conn.execute(
-        "INSERT INTO threads VALUES (?,?,?,?,?,?,?)",
-        ("thread-abc", "Test session", "my token is ghp_aBcDeFgHiJkLmNoPqRsTuVwXyZ123456789012", "gpt-4o", "/tmp/proj", 1704067200, 1704067260),
-    )
-    conn.commit()
-    conn.close()
+        conn.commit()
 
     # logs_2.sqlite: logs table (empty for this fixture)
     logs_db = codex / "logs_2.sqlite"
-    conn2 = sqlite3.connect(logs_db)
-    conn2.execute("CREATE TABLE logs (id INTEGER PRIMARY KEY, feedback_log_body TEXT)")
-    conn2.commit()
-    conn2.close()
+    with closing(sqlite3.connect(logs_db)) as conn2:
+        conn2.execute("CREATE TABLE logs (id INTEGER PRIMARY KEY, feedback_log_body TEXT)")
+        conn2.commit()
 
     return codex
 

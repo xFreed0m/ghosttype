@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "ghosttype"
-version = "0.2.0"
-description = "Local forensic scanner for AI tool conversation credentials"
+version = "0.4.0"
+description = "Local forensic scanner for AI tool conversation credentials (TruffleHog + in-tree pattern engine)"
 requires-python = ">=3.11"
 dependencies = [
     "click>=8.0",
@@ -24,3 +24,31 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["ghosttype"]
+# chatgpt.py is excluded wholesale, with reason: its credential-bearing path
+# is macOS Keychain retrieval (`security find-generic-password`) plus Chrome
+# OSCrypt AES-128-CBC decryption. Exercising it requires either a live
+# Keychain entry or mocking the crypto primitives; mocking the crypto would
+# assert only that mocks were called, not real behavior. Its pure
+# discovery/path logic is still covered by tests/scanners/test_chatgpt.py.
+omit = ["ghosttype/scanners/chatgpt.py"]
+
+[tool.coverage.report]
+show_missing = true
+# Fail the run below the project floor. 95%, not 100%: the last few percent is
+# genuinely-unreachable defensive code (developer-error guards, impossible
+# branches) — chasing it incentivises deleting graceful error handling.
+fail_under = 95
+# Single source of truth for "what is excluded from the >=95% target and why".
+# Every exclusion is documented at its definition with `# pragma: no cover`.
+exclude_lines = [
+    # Explicitly-marked unreachable/defensive/entrypoint lines. Each in-source
+    # occurrence carries a one-line reason next to the pragma.
+    "# pragma: no cover",
+    # `if __name__ == "__main__":` dispatch is entrypoint plumbing, exercised
+    # only by the installed console script, never by importable logic.
+    'if __name__ == .__main__.:',
+]

@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from pathlib import Path
-from ghosttype.models import ConversationRecord, TextChunk, PatternMatch, Finding
+from ghosttype.models import ConversationRecord, TextChunk, Finding
 
 
 def test_conversation_record_fields():
@@ -27,17 +27,42 @@ def test_text_chunk_back_reference():
     assert chunk.record is rec
 
 
-def test_finding_fields():
+def test_finding_default_fields():
     now = datetime.now(timezone.utc)
     f = Finding(
         tool="cursor",
-        secret_type="aws_access_key",
-        secret_value="AKIAIOSFODNN7EXAMPLE",
+        secret_type="github",
+        secret_value="ghp_xxx",
         file_path=Path("/tmp/state.vscdb"),
         position="composerData:uuid-1:42",
-        confidence="high",
-        context="aws_access_key_id = AKIAIOSFODNN7EXAMPLE",
+        confidence="unverified",
+        context="ghp_xxx",
         discovered_at=now,
     )
-    assert f.confidence == "high"
-    assert f.secret_type == "aws_access_key"
+    assert f.verified is False
+    assert f.detector_name == ""
+    assert f.verification_error is None
+    assert f.extra_data == {}
+
+
+def test_finding_verified_fields():
+    now = datetime.now(timezone.utc)
+    f = Finding(
+        tool="claude_code",
+        secret_type="aws",
+        secret_value="AKIA00000000000000000",
+        file_path=Path("/tmp/session.jsonl"),
+        position="line:1",
+        confidence="verified",
+        context="...AKIA00000000000000000...",
+        discovered_at=now,
+        severity="critical",
+        verified=True,
+        detector_name="AWS",
+        extra_data={"resource_type": "Access key"},
+    )
+    assert f.verified is True
+    assert f.confidence == "verified"
+    assert f.severity == "critical"
+    assert f.detector_name == "AWS"
+    assert f.extra_data["resource_type"] == "Access key"

@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -47,7 +48,13 @@ class CursorScanner(Scanner):
         """Query a single Cursor SQLite DB and return ConversationRecords."""
         records: list[ConversationRecord] = []
         try:
-            with sqlite3.connect(f"file:{db_path}?mode=ro", uri=True) as conn:
+            # `with sqlite3.connect(...)` only commits/rolls back the
+            # transaction; it does NOT close the connection. Wrap in
+            # contextlib.closing so the handle is released deterministically
+            # instead of leaking until GC (ResourceWarning under -W error).
+            with closing(
+                sqlite3.connect(f"file:{db_path}?mode=ro", uri=True)
+            ) as conn:
                 rows = conn.execute(
                     "SELECT key, value FROM cursorDiskKV WHERE key LIKE 'composerData:%'"
                 ).fetchall()

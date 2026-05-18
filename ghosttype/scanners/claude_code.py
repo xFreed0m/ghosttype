@@ -11,28 +11,57 @@ from ghosttype.scanners.base import Scanner
 
 logger = logging.getLogger(__name__)
 
-_CONTENT_TYPES = {"user", "assistant"}
+# Top-level record types whose payload should be mined for credentials.
+# - user/assistant: the conversation itself
+# - attachment: pasted clipboard content, dropped files, image OCR, etc.
+# - system: hook output, tool-call errors, compact metadata
+# - file-history-snapshot: file contents Claude touched (can include .env etc)
+_CONTENT_RECORD_TYPES = {
+    "user",
+    "assistant",
+    "attachment",
+    "system",
+    "file-history-snapshot",
+}
 
 
 def _extract_content_text(content: str | list) -> str:
-    """Extract plain text from a message content field.
+    """Extract plain text from a message `content` field.
 
-    Handles both string content and content block arrays of the form
-    [{"type": "text", "text": "..."}, ...].
+    Handles all Anthropic content block kinds that can plausibly carry pasted
+    secrets:
+
+    - string content (legacy / shorthand)
+    - {"type":"text", "text":"..."}
+    - {"type":"thinking", "thinking":"..."} — extended thinking output
+    - {"type":"tool_use", "input": {...}} — flatten every string leaf in the
+      tool input (bash commands, file paths, MCP args, etc.)
+    - {"type":"tool_result", "content": "..." | [{"type":"text", "text":"..."}, ...]}
+
+    Block kinds that cannot carry text (image, document, etc.) are skipped.
     """
     if isinstance(content, str):
         return content
     parts: list[str] = []
     for block in content:
-        if isinstance(block, dict):
-            if block.get("type") == "text":
-                parts.append(block.get("text", ""))
-            elif block.get("type") == "tool_result":
-                inner = block.get("content", [])
-                if isinstance(inner, list):
-                    for b in inner:
-                        if isinstance(b, dict) and b.get("type") == "text":
-                            parts.append(b.get("text", ""))
+        if not isinstance(block, dict):
+            continue
+        btype = block.get("type")
+        if btype == "text":
+            parts.append(block.get("text", ""))
+        elif btype == "thinking":
+            parts.append(block.get("thinking", ""))
+        elif btype == "tool_use":
+            # tool_use.input is an arbitrary dict; recurse into every string.
+            parts.extend(_extract_strings_from_json(block.get("input", {}), min_len=1))
+        elif btype == "tool_result":
+            inner = block.get("content", [])
+            if isinstance(inner, str):
+                parts.append(inner)
+            elif isinstance(inner, list):
+                for b in inner:
+                    if isinstance(b, dict) and b.get("type") == "text":
+                        parts.append(b.get("text", ""))
     return "\n".join(parts)
 
 
@@ -48,6 +77,36 @@ def _extract_strings_from_json(data: Any, min_len: int = 8) -> list[str]:
         for item in data:
             results.extend(_extract_strings_from_json(item, min_len))
     return results
+
+
+def _extract_record_text(entry: dict) -> str:
+    """Pull credential-bearing text out of a top-level JSONL record.
+
+    Dispatches on `entry["type"]`. Records whose type is not in
+    `_CONTENT_RECORD_TYPES` return ""; the caller skips empty chunks.
+    """
+    rtype = entry.get("type")
+    if rtype in {"user", "assistant"}:
+        msg = entry.get("message", {}) or {}
+        return _extract_content_text(msg.get("content", ""))
+    if rtype == "attachment":
+        # `attachment` payload lives under entry["attachment"] (a dict).
+        # Flatten string leaves; skip identifier fields handled in the loop.
+        return "\n".join(_extract_strings_from_json(entry.get("attachment", {})))
+    if rtype == "system":
+        # `system` records carry hook output / compact info / tool errors in
+        # both `content` and `compactMetadata`. Mine both.
+        chunks: list[str] = []
+        content = entry.get("content")
+        if isinstance(content, str):
+            chunks.append(content)
+        chunks.extend(_extract_strings_from_json(entry.get("compactMetadata", {})))
+        return "\n".join(chunks)
+    if rtype == "file-history-snapshot":
+        # `snapshot` holds the file contents Claude saw. Anything inside is fair
+        # game for the scanner.
+        return "\n".join(_extract_strings_from_json(entry.get("snapshot", {})))
+    return ""
 
 
 class ClaudeCodeScanner(Scanner):
@@ -121,7 +180,11 @@ class ClaudeCodeScanner(Scanner):
             return self._extract_session(record)
 
     def _extract_session(self, record: ConversationRecord) -> list[TextChunk]:
-        """Extract all text-bearing messages from a JSONL session file."""
+        """Extract text-bearing content from every record type that can carry
+        pasted secrets — `user`, `assistant`, `attachment`, `system`, and
+        `file-history-snapshot`. Bookkeeping types (`queue-operation`,
+        `last-prompt`, `permission-mode`, `ai-title`, `pr-link`) are skipped.
+        """
         chunks: list[TextChunk] = []
         try:
             with record.source_path.open(encoding="utf-8", errors="replace") as fh:
@@ -133,11 +196,9 @@ class ClaudeCodeScanner(Scanner):
                         entry = json.loads(line)
                     except json.JSONDecodeError:
                         continue
-                    if entry.get("type") not in _CONTENT_TYPES:
+                    if entry.get("type") not in _CONTENT_RECORD_TYPES:
                         continue
-                    msg = entry.get("message", {})
-                    content = msg.get("content", "")
-                    text = _extract_content_text(content)
+                    text = _extract_record_text(entry)
                     if text.strip():
                         chunks.append(
                             TextChunk(

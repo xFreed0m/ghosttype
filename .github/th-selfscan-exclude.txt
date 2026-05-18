@@ -1,0 +1,14 @@
+# Path regexes excluded from ghosttype's egress-BLOCKED self secret-scan.
+#
+# Under egress-policy: block the test job's self-scan runs --no-verification
+# (TruffleHog's live verifier needs egress to ~750 provider hosts; that is
+# incompatible with a blocked runner and unnecessary here — the repo's only
+# credential-shaped strings are intentional test/catalog fakes). So the scan
+# is detection-only and MUST skip the files that embed credential SHAPES by
+# design. What remains (the shipped package logic) must be credential-free;
+# a real secret committed there still fails the build (verified locally).
+#
+# End-user runtime verification is unaffected — this only governs CI's own
+# self-scan. One regex per line, matched against the file path.
+patterns\.py
+__pycache__

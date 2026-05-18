@@ -1,5 +1,6 @@
 import json
 import sqlite3
+from contextlib import closing
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -12,8 +13,6 @@ from ghosttype.scanners.cursor import CursorScanner
 def cursor_db(tmp_path) -> Path:
     """Synthetic state.vscdb with one composerData entry containing a fake credential."""
     db_path = tmp_path / "state.vscdb"
-    conn = sqlite3.connect(db_path)
-    conn.execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value TEXT)")
     conversation_data = json.dumps({
         "_v": 1,
         "composerId": "composer-uuid-1",
@@ -21,12 +20,13 @@ def cursor_db(tmp_path) -> Path:
         "conversationMap": {},
         "createdAt": 1704067200000,
     })
-    conn.execute(
-        "INSERT INTO cursorDiskKV (key, value) VALUES (?, ?)",
-        ("composerData:composer-uuid-1", conversation_data),
-    )
-    conn.commit()
-    conn.close()
+    with closing(sqlite3.connect(db_path)) as conn:
+        conn.execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value TEXT)")
+        conn.execute(
+            "INSERT INTO cursorDiskKV (key, value) VALUES (?, ?)",
+            ("composerData:composer-uuid-1", conversation_data),
+        )
+        conn.commit()
     return db_path
 
 
@@ -72,14 +72,13 @@ def test_extract_text_position_includes_row_key(cursor_db, monkeypatch):
 
 def _make_vscdb(path: Path, composer_id: str, text: str) -> None:
     """Helper: create a minimal state.vscdb at path."""
-    conn = sqlite3.connect(path)
-    conn.execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value TEXT)")
-    conn.execute(
-        "INSERT INTO cursorDiskKV (key, value) VALUES (?, ?)",
-        (f"composerData:{composer_id}", json.dumps({"composerId": composer_id, "text": text})),
-    )
-    conn.commit()
-    conn.close()
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute("CREATE TABLE cursorDiskKV (key TEXT PRIMARY KEY, value TEXT)")
+        conn.execute(
+            "INSERT INTO cursorDiskKV (key, value) VALUES (?, ?)",
+            (f"composerData:{composer_id}", json.dumps({"composerId": composer_id, "text": text})),
+        )
+        conn.commit()
 
 
 def test_discover_also_scans_workspace_dbs(tmp_path, monkeypatch):

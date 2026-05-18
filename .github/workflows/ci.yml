@@ -1,0 +1,370 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Least privilege by default for every job in this workflow.
+# defends: token-scope abuse via a compromised action (tj-actions/changed-files CVE-2025-30066 class)
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.13"]
+
+    steps:
+      # First step of every job: BLOCK runner egress to all but an explicit
+      # allowlist, so a compromised dependency cannot exfiltrate. block (not
+      # audit) actually prevents the connection; audit only observes it.
+      # Allowlist derived empirically from real harden-runner audit runs.
+      # The self-scan below runs --no-verification (see that step) so this
+      # job needs NO credential-provider egress — only build infra.
+      # defends: post-install data exfiltration (Shai-Hulud npm worm class)
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
+        with:
+          egress-policy: block
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            codeload.github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # defends: credential persistence in .git/config reused by later steps
+          persist-credentials: false
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Pinned-release install of TruffleHog. We download the exact tagged
+      # release asset + its checksums file and verify before extracting.
+      # We never pipe a script fetched from a mutable ref into a shell.
+      # defends: remote-script-takeover (xz-utils CVE-2024-3094 class)
+      - name: Install TruffleHog (pinned + checksum-verified)
+        env:
+          TRUFFLEHOG_VERSION: "3.94.3"
+        run: |
+          set -euo pipefail
+          base="https://github.com/trufflesecurity/trufflehog/releases/download/v${TRUFFLEHOG_VERSION}"
+          tarball="trufflehog_${TRUFFLEHOG_VERSION}_linux_amd64.tar.gz"
+          checksums="trufflehog_${TRUFFLEHOG_VERSION}_checksums.txt"
+          tmp="$(mktemp -d)"
+          cd "$tmp"
+          curl -sSfL -o "$tarball" "${base}/${tarball}"
+          curl -sSfL -o "$checksums" "${base}/${checksums}"
+          # --ignore-missing: the checksums file lists every platform asset;
+          # we only downloaded the linux_amd64 tarball.
+          sha256sum --ignore-missing -c "$checksums"
+          tar -xzf "$tarball" trufflehog
+          install -m 0755 trufflehog /usr/local/bin/trufflehog
+          cd -
+          rm -rf "$tmp"
+          trufflehog --version
+
+      # Hashed dependency install. --require-hashes is incompatible with an
+      # editable install, so this is two steps:
+      #   (a) install the fully-pinned hashed closure (incl. hatchling + dev),
+      #   (b) install this package itself, no deps, no build isolation.
+      # defends: dependency-confusion / tampered-wheel substitution
+      - name: Install dependencies (hashed closure)
+        run: |
+          set -euo pipefail
+          # No `pip install --upgrade pip`: that fetch is itself unpinned
+          # (Scorecard Pinned-Dependencies). The runner's pip ships with the
+          # SHA-pinned actions/setup-python above and already supports
+          # --require-hashes — one fewer unpinned network fetch is strictly safer.
+          pip install --require-hashes -r requirements.lock
+          pip install -e . --no-deps --no-build-isolation
+
+      # Repo-self secret scan using the pinned binary we installed above.
+      # DETECTION-ONLY by design: this runner is egress-blocked, and
+      # TruffleHog's live verifier needs reach to ~750 provider hosts
+      # (verified from its v3.94.3 source) — incompatible with block-mode
+      # and unnecessary here. The scan is scoped to the shipped package
+      # and skips the files that embed credential SHAPES by design
+      # (pattern catalog, __pycache__) via --exclude-paths, so any real
+      # secret committed into shipped code still fails the build while the
+      # intentional test/catalog fakes do not false-positive. End-user
+      # runtime verification is unaffected (this governs CI only).
+      # defends: committed-secret leak in shipped code
+      - name: Secret scan (self, detection-only — egress-blocked runner)
+        run: >
+          trufflehog filesystem ghosttype/
+          --no-verification --no-update --fail
+          --exclude-paths=.github/th-selfscan-exclude.txt
+
+      # Identical gate to `make check` (kept in sync by hand; see Makefile).
+      # Fails the build below the 95% line/branch floor (fail_under in
+      # pyproject.toml [tool.coverage.report]). Floor is 95, never 100.
+      - name: Test + coverage gate
+        run: pytest --cov=ghosttype --cov-report=term-missing --cov-fail-under=95 -q
+
+  codeql:
+    name: CodeQL SAST
+    runs-on: ubuntu-latest
+    # security-events:write is required for the SARIF upload to succeed;
+    # omitting it turns the upload (and therefore the job) red.
+    # defends: undetected injection/SSRF-class defects shipping to main
+    permissions:
+      security-events: write
+      actions: read
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
+        with:
+          egress-policy: block
+          # CodeQL bundle + Opengrep (semgrep.dev registry) + Cosign/sigstore
+          # signature verification + SARIF upload. Derived from audit runs.
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            uploads.github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            raw.githubusercontent.com:443
+            results-receiver.actions.githubusercontent.com:443
+            codeql.githubusercontent.com:443
+            *.blob.core.windows.net:443
+            pypi.org:443
+            files.pythonhosted.org:443
+            semgrep.dev:443
+            fulcio.sigstore.dev:443
+            rekor.sigstore.dev:443
+            tuf-repo-cdn.sigstore.dev:443
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.11"
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@78ed0c7291d93e40c51b085850dc669a4c3ab73b # v3
+        with:
+          languages: python
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@78ed0c7291d93e40c51b085850dc669a4c3ab73b # v3
+
+      # Opengrep (OSS LGPL-2.1 fork of the Semgrep engine) second-opinion SAST.
+      # No blanket suppression: the ONE documented exception is the forensic
+      # AES-CBC-interop true-positive in chatgpt.py, suppressed inline with a
+      # `# nosemgrep: <rule-id>` annotation that Opengrep honors natively
+      # (its NOSEM regex accepts the `nosemgrep:` token, same engine path).
+      # `--error` is OFF by default — a bare `opengrep scan` exits 0 even
+      # with ERROR findings, so the hard gate MUST pass --severity ERROR
+      # --error. The install.sh bootstrap is fetched from an IMMUTABLE commit
+      # SHA (a git tag is force-pushable) and sha256-verified BEFORE it runs;
+      # --verify-signatures (Cosign) then covers the downloaded binary. Both
+      # the script and the binary are integrity-checked — same Baseline-1
+      # discipline as the TruffleHog install.
+      # defends: same-vendor SAST blind spots; remote-script-takeover
+      # cosign is NOT preinstalled on ubuntu-latest; the Opengrep installer's
+      # --verify-signatures needs it. Pinned official installer action.
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@d58896d6a1865668819e1d91763c7751a165e159 # v3.9.2
+
+      - name: Opengrep SAST (pinned + Cosign-verified)
+        env:
+          # Passed via env, NOT interpolated into the script: an attacker-
+          # controlled PR base ref must not be able to inject shell. This is
+          # the fix for zizmor's template-injection finding.
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          # Immutable commit for opengrep v1.21.0. raw.githubusercontent.com
+          # serves whatever a ref currently points at, and a tag can be
+          # force-pushed — so the script is pinned by commit SHA AND verified
+          # against a recorded digest before execution. Bump both together;
+          # recompute the digest from the new commit's install.sh.
+          OPENGREP_COMMIT: 146ca6b12422e5f2718c6e506badfb035c9f49aa
+          OPENGREP_INSTALL_SHA256: d00ea682170261f09d483496d7cc9864ce58f8e527f1e134a71351b23cd1f9ed
+        run: |
+          set -euo pipefail
+          curl -fsSL "https://raw.githubusercontent.com/opengrep/opengrep/${OPENGREP_COMMIT}/install.sh" -o /tmp/opengrep-install.sh
+          # Integrity-gate the bootstrap script itself BEFORE running it.
+          # --verify-signatures (below) only covers the downloaded binary.
+          echo "${OPENGREP_INSTALL_SHA256}  /tmp/opengrep-install.sh" | sha256sum -c -
+          # install.sh uses `set -o pipefail` (a bashism); run it with bash,
+          # NOT sh — ubuntu's /bin/sh is dash and aborts on pipefail.
+          bash /tmp/opengrep-install.sh -v v1.21.0 --verify-signatures
+          export PATH="$HOME/.opengrep/cli/latest:$PATH"
+          opengrep --version
+          # Scale: on a pull_request, scan ONLY code changed vs the base
+          # (--baseline-commit); on push BASE_SHA is empty -> full scan.
+          opengrep scan --config p/python --severity ERROR --error \
+            ${BASE_SHA:+--baseline-commit "$BASE_SHA"} \
+            --jobs "$(nproc)" --sarif-output=opengrep.sarif .
+
+      - name: Upload Opengrep SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@78ed0c7291d93e40c51b085850dc669a4c3ab73b # v3
+        with:
+          sarif_file: opengrep.sarif
+
+  sca:
+    name: Dependency audit (SCA)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
+        with:
+          egress-policy: block
+          # osv-scanner (OSV.dev) + pip-audit (PyPA) over the pinned closure.
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
+            api.osv.dev:443
+
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          # Must match the Python that compiled requirements-citools.lock:
+          # --require-hashes is Python-version sensitive (e.g. `referencing`
+          # pulls `typing-extensions` only on python_version < "3.13", so a
+          # 3.13-resolved lock is missing it on 3.11 and the install fails).
+          python-version: "3.13"
+
+      # OSV.dev breadth: osv-scanner queries the OSV database (CVE + GHSA +
+      # PyPA + ecosystem advisories) — wider than pip-audit's PyPA-only feed.
+      # Two complementary SCA sources, not redundant.
+      # defends: known-CVE dependency shipped to users (advisory breadth)
+      # google/osv-scanner-action is a REUSABLE WORKFLOW, not a composite
+      # action — `uses:` in a step fails ("no top-level runs:"). Run the
+      # pinned, checksum-verified osv-scanner binary instead (fewer deps).
+      - name: osv-scanner (OSV.dev, pinned + checksum-verified)
+        run: |
+          set -euo pipefail
+          v=v2.3.8
+          base="https://github.com/google/osv-scanner/releases/download/${v}"
+          curl -fsSL -O "${base}/osv-scanner_linux_amd64"
+          curl -fsSL -O "${base}/osv-scanner_SHA256SUMS"
+          # SHA256SUMS lists every platform asset; we fetched only one.
+          sha256sum --ignore-missing -c osv-scanner_SHA256SUMS
+          chmod +x osv-scanner_linux_amd64
+          # `requirements.lock` is a non-standard filename, so auto-discovery
+          # ("scan source -r ." -> "No package sources found", exit 128)
+          # misses it. osv-scanner v2 explicit form: --lockfile
+          # '<parse-as>:<path>' — parse it AS pip requirements.txt format
+          # (sourced: osv-scanner docs/scan-source.md).
+          ./osv-scanner_linux_amd64 scan source --lockfile 'requirements.txt:requirements.lock'
+
+      # Gate on vulnerabilities in the runtime/build closure. --strict makes
+      # any audit warning (e.g. a package with no known-vuln data) fail too.
+      # defends: known-CVE dependency shipped to users
+      - name: pip-audit (runtime + build closure)
+        run: |
+          set -euo pipefail
+          # Hash-pinned CI-tool install (Scorecard Pinned-Dependencies):
+          # version-pin alone is not enough — the wheel bytes are verified.
+          pip install --require-hashes -r requirements-citools.lock
+          pip-audit -r requirements.lock --strict
+
+      # Dev-only tooling findings are advisory per ISA decision (DECISIONS.md):
+      # dev tools are not shipped to users, so a finding here informs but does
+      # not block. No silent ignore list — every finding is still printed.
+      - name: pip-audit (dev tooling, advisory)
+        continue-on-error: true
+        run: pip-audit -r requirements.lock --desc
+
+  # The workflows are themselves attack surface (this repo ships several).
+  # zizmor is the purpose-built GitHub-Actions security auditor — pinned via
+  # pip, no new third-party Action added (actionlint runs in pre-commit).
+  # defends: dangerous-workflow / template-injection / unpinned-action drift
+  workflow-security:
+    name: Workflow security (zizmor)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
+        with:
+          egress-policy: block
+          # zizmor installed from the hashed citools lock (PyPI) only.
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+            objects.githubusercontent.com:443
+            release-assets.githubusercontent.com:443
+            pypi.org:443
+            files.pythonhosted.org:443
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          # Matches the Python requirements-citools.lock was compiled on
+          # (--require-hashes is Python-version sensitive — see sca job).
+          python-version: "3.13"
+      - name: zizmor (pinned)
+        run: |
+          set -euo pipefail
+          # Hash-pinned CI-tool install (Scorecard Pinned-Dependencies).
+          pip install --require-hashes -r requirements-citools.lock
+          zizmor --persona=regular .github/workflows/
+
+  # PR-time dependency vuln + license gate. Requires the repo's Dependency
+  # Graph to be enabled (Settings → Code security) — see SSCS-USER-ACTIONS.md.
+  # defends: a vulnerable/disallowed-licensed dep entering via a PR
+  dependency-review:
+    name: Dependency review (PR)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Harden runner
+        uses: step-security/harden-runner@ab7a9404c0f3da075243ca237b5fac12c98deaa5 # v2
+        with:
+          egress-policy: block
+          # actions/dependency-review-action talks to the GitHub API only.
+          allowed-endpoints: >
+            github.com:443
+            api.github.com:443
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+      - name: Dependency review
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+          deny-licenses: GPL-3.0
