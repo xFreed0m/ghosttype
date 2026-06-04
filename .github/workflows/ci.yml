@@ -164,12 +164,12 @@ jobs:
           python-version: "3.11"
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@458d36d7d4f47d0dd16ca424c1d3cda0060f1360 # v3
+        uses: github/codeql-action/init@87557b9c84dde89fdd9b10e88954ac2f4248e463 # v3
         with:
           languages: python
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@458d36d7d4f47d0dd16ca424c1d3cda0060f1360 # v3
+        uses: github/codeql-action/analyze@87557b9c84dde89fdd9b10e88954ac2f4248e463 # v3
 
       # Opengrep (OSS LGPL-2.1 fork of the Semgrep engine) second-opinion SAST.
       # No blanket suppression: the ONE documented exception is the forensic
@@ -220,7 +220,7 @@ jobs:
 
       - name: Upload Opengrep SARIF
         if: always()
-        uses: github/codeql-action/upload-sarif@458d36d7d4f47d0dd16ca424c1d3cda0060f1360 # v3
+        uses: github/codeql-action/upload-sarif@87557b9c84dde89fdd9b10e88954ac2f4248e463 # v3
         with:
           sarif_file: opengrep.sarif
 
