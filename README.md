@@ -70,7 +70,7 @@ ghosttype doctor
 ## Quick start
 
 ```bash
-git clone https://github.com/p4gs/ghosttype
+git clone https://github.com/xFreed0m/ghosttype
 cd ghosttype
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[dev]"
