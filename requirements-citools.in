@@ -4,5 +4,5 @@
 #   pip-compile --generate-hashes --output-file=requirements-citools.lock requirements-citools.in
 # These tools never ship to users; they run only in CI jobs.
 pip-audit==2.10.1
-zizmor==1.26.1
+zizmor==1.27.0
 cyclonedx-bom==7.3.0
