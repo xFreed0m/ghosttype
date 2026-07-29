@@ -4,7 +4,7 @@ import json
 import logging
 import sqlite3
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from ghosttype.models import ConversationRecord, TextChunk
@@ -80,7 +80,7 @@ class CursorScanner(Scanner):
             composer_id = data.get("composerId", key.split(":", 1)[-1])
             created_ms = data.get("createdAt")
             created_at = (
-                datetime.fromtimestamp(created_ms / 1000, tz=timezone.utc)
+                datetime.fromtimestamp(created_ms / 1000, tz=UTC)
                 if created_ms
                 else None
             )

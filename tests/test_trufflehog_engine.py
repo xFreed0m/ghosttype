@@ -7,12 +7,11 @@ tests/test_integration.py.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
-
 from ghosttype import trufflehog_engine as te
 from ghosttype.models import ConversationRecord, TextChunk
 
@@ -25,7 +24,7 @@ def fake_record(tmp_path):
         source_path=src,
         tool="claude_code",
         conversation_id="conv-abc",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         raw={},
     )
 
@@ -78,9 +77,8 @@ def test_resolve_binary_env_override(monkeypatch):
 
 def test_resolve_binary_raises_when_missing(monkeypatch):
     monkeypatch.delenv("GHOSTTYPE_TRUFFLEHOG_BIN", raising=False)
-    with _which_returns(None):
-        with pytest.raises(te.TruffleHogNotFoundError):
-            te.resolve_binary()
+    with _which_returns(None), pytest.raises(te.TruffleHogNotFoundError):
+        te.resolve_binary()
 
 
 def test_scan_chunks_empty_returns_empty():
@@ -305,13 +303,12 @@ def test_scan_chunks_returns_empty_when_all_chunks_blank(fake_record):
         TextChunk(text="", position="line:1", record=fake_record),
         TextChunk(text="  ", position="line:2", record=fake_record),
     ]
-    with _which_returns("/usr/local/bin/trufflehog"):
-        with patch(
-            "ghosttype.trufflehog_engine.subprocess.run"
-        ) as run_mock:
-            findings = te.scan_chunks(
-                "claude_code", chunks, binary="/usr/local/bin/trufflehog"
-            )
+    with _which_returns("/usr/local/bin/trufflehog"), patch(
+        "ghosttype.trufflehog_engine.subprocess.run"
+    ) as run_mock:
+        findings = te.scan_chunks(
+            "claude_code", chunks, binary="/usr/local/bin/trufflehog"
+        )
     assert findings == []
     run_mock.assert_not_called()
 

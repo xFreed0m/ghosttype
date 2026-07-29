@@ -1,5 +1,6 @@
+from datetime import UTC
 from pathlib import Path
-import pytest
+
 from ghosttype.scanners.claude_code import ClaudeCodeScanner
 
 FIXTURE = Path(__file__).parent.parent / "fixtures" / "sample_conversation.jsonl"
@@ -30,14 +31,15 @@ def test_discover_finds_jsonl_files(tmp_path, monkeypatch):
 
 
 def test_extract_text_from_string_content():
+    from datetime import datetime
+
     from ghosttype.models import ConversationRecord
-    from datetime import datetime, timezone
     s = ClaudeCodeScanner()
     rec = ConversationRecord(
         source_path=FIXTURE,
         tool="claude_code",
         conversation_id="sess-1",
-        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
         raw=None,
     )
     chunks = s.extract_text(rec)
@@ -46,14 +48,15 @@ def test_extract_text_from_string_content():
 
 
 def test_extract_text_from_content_block_array():
+    from datetime import datetime
+
     from ghosttype.models import ConversationRecord
-    from datetime import datetime, timezone
     s = ClaudeCodeScanner()
     rec = ConversationRecord(
         source_path=FIXTURE,
         tool="claude_code",
         conversation_id="sess-1",
-        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
         raw=None,
     )
     chunks = s.extract_text(rec)
@@ -63,14 +66,15 @@ def test_extract_text_from_content_block_array():
 
 
 def test_extract_text_position_is_line_number():
+    from datetime import datetime
+
     from ghosttype.models import ConversationRecord
-    from datetime import datetime, timezone
     s = ClaudeCodeScanner()
     rec = ConversationRecord(
         source_path=FIXTURE,
         tool="claude_code",
         conversation_id="sess-1",
-        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
         raw=None,
     )
     chunks = s.extract_text(rec)
@@ -91,8 +95,9 @@ def test_discover_includes_history_jsonl(tmp_path, monkeypatch):
 def test_extract_text_from_history(tmp_path):
     """History entries with display text are extracted; slash commands are skipped."""
     import json
+    from datetime import datetime
+
     from ghosttype.models import ConversationRecord
-    from datetime import datetime, timezone
 
     history = tmp_path / "history.jsonl"
     lines = [
@@ -107,7 +112,7 @@ def test_extract_text_from_history(tmp_path):
         source_path=history,
         tool="claude_code",
         conversation_id="history",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         raw={"source_type": "history"},
     )
     chunks = s.extract_text(rec)
@@ -135,8 +140,9 @@ def test_discover_includes_task_json_files(tmp_path, monkeypatch):
 def test_extract_text_from_task_json(tmp_path):
     """String values are recursively extracted from task JSON."""
     import json
+    from datetime import datetime
+
     from ghosttype.models import ConversationRecord
-    from datetime import datetime, timezone
 
     task_file = tmp_path / "task-xyz.json"
     task_data = {
@@ -151,7 +157,7 @@ def test_extract_text_from_task_json(tmp_path):
         source_path=task_file,
         tool="claude_code",
         conversation_id="task-xyz",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         raw={"source_type": "task"},
     )
     chunks = s.extract_text(rec)
@@ -170,8 +176,9 @@ def test_extract_text_from_task_json(tmp_path):
 def _make_session(tmp_path, lines):
     """Helper: write a JSONL session file and return a discover record for it."""
     import json
+    from datetime import datetime
+
     from ghosttype.models import ConversationRecord
-    from datetime import datetime, timezone
 
     path = tmp_path / "audit-session.jsonl"
     path.write_text("\n".join(json.dumps(l) for l in lines) + "\n")
@@ -179,7 +186,7 @@ def _make_session(tmp_path, lines):
         source_path=path,
         tool="claude_code",
         conversation_id="audit",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         raw=None,
     )
 

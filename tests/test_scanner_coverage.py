@@ -11,24 +11,23 @@ import json
 import logging
 import sqlite3
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import PropertyMock, patch
 
 import pytest
-
 from ghosttype.models import ConversationRecord, Finding
+from ghosttype.report import copy_sources
+from ghosttype.scanner import Orchestrator
 from ghosttype.scanners.base import Scanner
 from ghosttype.scanners.claude import ClaudeScanner
 from ghosttype.scanners.codex import CodexScanner
 from ghosttype.scanners.cursor import CursorScanner
-from ghosttype.scanner import Orchestrator
-from ghosttype.report import copy_sources
-
 
 # ---------------------------------------------------------------------------
 # CursorScanner
 # ---------------------------------------------------------------------------
+
 
 def _cursor_db(path: Path, rows: list[tuple[str, str]]) -> None:
     with closing(sqlite3.connect(path)) as conn:
@@ -66,9 +65,8 @@ def test_cursor_corrupt_db_is_logged_not_raised(tmp_path, caplog):
     bad.write_text("this is not a sqlite file")
     s = CursorScanner()
     with patch.object(type(s), "_db_path", new_callable=PropertyMock, return_value=bad), \
-         patch.object(type(s), "_workspace_dbs", return_value=[]):
-        with caplog.at_level(logging.WARNING):
-            assert s.discover() == []
+         patch.object(type(s), "_workspace_dbs", return_value=[]), caplog.at_level(logging.WARNING):
+        assert s.discover() == []
     assert "Failed to read cursor db" in caplog.text
 
 
@@ -81,9 +79,8 @@ def test_cursor_workspace_db_without_composer_table_is_skipped(tmp_path, caplog)
         conn.commit()
     s = CursorScanner()
     with patch.object(type(s), "_db_path", new_callable=PropertyMock, return_value=db), \
-         patch.object(type(s), "_workspace_dbs", return_value=[]):
-        with caplog.at_level(logging.DEBUG):
-            assert s.discover() == []
+         patch.object(type(s), "_workspace_dbs", return_value=[]), caplog.at_level(logging.DEBUG):
+        assert s.discover() == []
     assert "no cursorDiskKV table" in caplog.text
 
 
@@ -239,7 +236,7 @@ def test_claude_stub_discover_and_extract_return_empty(tmp_path):
     s = ClaudeScanner()
     rec = ConversationRecord(
         source_path=tmp_path / "x", tool="claude", conversation_id="s",
-        created_at=datetime.now(timezone.utc), raw={},
+        created_at=datetime.now(UTC), raw={},
     )
     assert s.discover() == []
     assert s.extract_text(rec) == []
@@ -256,7 +253,7 @@ def test_copy_sources_skips_finding_whose_source_file_is_gone(tmp_path):
     f = Finding(
         tool="claude_code", secret_type="github", secret_value="x",
         file_path=gone, position="line:1", confidence="unverified",
-        context="x", discovered_at=datetime.now(timezone.utc),
+        context="x", discovered_at=datetime.now(UTC),
     )
     out = tmp_path / "sources"
     copy_sources([f], out)  # must not raise
@@ -289,15 +286,14 @@ def test_orchestrator_non_verbose_zero_chunks_is_silent(tmp_path, caplog):
     s.is_available.return_value = True
     rec = ConversationRecord(
         source_path=tmp_path / "s.jsonl", tool="fake", conversation_id="c",
-        created_at=datetime.now(timezone.utc), raw=None,
+        created_at=datetime.now(UTC), raw=None,
     )
     (tmp_path / "s.jsonl").write_text("x")
     s.discover.return_value = [rec]
     s.extract_text.return_value = []
     with patch("ghosttype.scanner.trufflehog_scan_chunks") as eng, \
-         patch("ghosttype.pattern_engine.scan_chunks"):
-        with caplog.at_level(logging.INFO):
-            findings = Orchestrator(scanners=[s], verbose=False).run()
+         patch("ghosttype.pattern_engine.scan_chunks"), caplog.at_level(logging.INFO):
+        findings = Orchestrator(scanners=[s], verbose=False).run()
     eng.assert_not_called()
     assert findings == []
     assert "extracted 0 text chunks" not in caplog.text

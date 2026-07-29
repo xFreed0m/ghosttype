@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 import sqlite3
 from contextlib import closing
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from ghosttype.models import ConversationRecord, TextChunk
@@ -49,7 +49,7 @@ class CodexScanner(Scanner):
 
         for thread_id, title, first_msg, created_ts in rows:
             created_at = (
-                datetime.fromtimestamp(created_ts, tz=timezone.utc)
+                datetime.fromtimestamp(created_ts, tz=UTC)
                 if created_ts
                 else None
             )

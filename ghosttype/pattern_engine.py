@@ -14,8 +14,8 @@ not catch. It complements TruffleHog; it does not replace it.
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from ghosttype.models import SOURCE_PATTERN, Finding, TextChunk
 from ghosttype.patterns import scan_text
@@ -90,7 +90,7 @@ def scan_chunks(
                     position=f"{chunk.position}:{match.char_offset}",
                     confidence=match.confidence,  # "high" | "medium"
                     context=match.context,
-                    discovered_at=datetime.now(timezone.utc),
+                    discovered_at=datetime.now(UTC),
                     severity=_severity_for(match.secret_type, match.confidence),
                     verified=False,  # pattern matching can never verify
                     detector_name="",

@@ -19,9 +19,9 @@ import re
 import shutil
 import subprocess
 import tempfile
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Sequence
 
 from ghosttype.models import ConversationRecord, Finding, TextChunk
 
@@ -327,7 +327,7 @@ def scan_chunks(
                     position=position,
                     confidence="verified" if verified else "unverified",
                     context=context,
-                    discovered_at=datetime.now(timezone.utc),
+                    discovered_at=datetime.now(UTC),
                     severity=_severity_for(detector_lower, verified),
                     verified=verified,
                     detector_name=detector_name,

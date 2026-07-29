@@ -15,6 +15,8 @@ from rich.table import Table
 from ghosttype.models import Finding
 from ghosttype.report import (
     copy_sources as copy_sources_fn,
+)
+from ghosttype.report import (
     finding_to_dict,
     write_csv,
     write_json,
@@ -285,7 +287,7 @@ def scan(
     suppressed_count = 0
     if allow_list:
         allowed: set[str] = set()
-        with open(allow_list) as f:
+        with Path(allow_list).open() as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#"):

@@ -1,4 +1,5 @@
-from pathlib import Path
+from datetime import UTC
+
 from ghosttype.scanners.claude import ClaudeScanner
 
 
@@ -20,14 +21,15 @@ def test_claude_scanner_is_available_returns_false_even_when_dir_exists(tmp_path
 
 
 def test_claude_scanner_extract_text_returns_empty(tmp_path, monkeypatch):
+    from datetime import datetime
+
     from ghosttype.models import ConversationRecord
-    from datetime import datetime, timezone
     s = ClaudeScanner()
     rec = ConversationRecord(
         source_path=tmp_path / "placeholder",
         tool="claude",
         conversation_id="stub",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         raw={},
     )
     assert s.extract_text(rec) == []

@@ -1,6 +1,7 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from ghosttype.models import ConversationRecord, TextChunk, Finding
+
+from ghosttype.models import ConversationRecord, Finding, TextChunk
 
 
 def test_conversation_record_fields():
@@ -8,7 +9,7 @@ def test_conversation_record_fields():
         source_path=Path("/tmp/test.jsonl"),
         tool="claude_code",
         conversation_id="abc-123",
-        created_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2026, 1, 1, tzinfo=UTC),
         raw={"messages": []},
     )
     assert rec.tool == "claude_code"
@@ -28,7 +29,7 @@ def test_text_chunk_back_reference():
 
 
 def test_finding_default_fields():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     f = Finding(
         tool="cursor",
         secret_type="github",
@@ -46,7 +47,7 @@ def test_finding_default_fields():
 
 
 def test_finding_verified_fields():
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     f = Finding(
         tool="claude_code",
         secret_type="aws",

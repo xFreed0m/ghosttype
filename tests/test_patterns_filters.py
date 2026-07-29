@@ -80,7 +80,7 @@ def test_heuristic_placeholder_is_filtered_but_real_value_reported():
     """A heuristic var-name signal with a placeholder value is dropped; the
     same signal with a high-entropy value is kept."""
     dropped = scan_text("api_key = your-key-here")
-    assert all("your-key-here" != m.secret_value for m in dropped)
+    assert all(m.secret_value != "your-key-here" for m in dropped)
 
     kept = scan_text("api_key = Zx9Q2mK7vL4pW1aB3cD5eF8gH0jR6tY")
     assert any(m.secret_value == "Zx9Q2mK7vL4pW1aB3cD5eF8gH0jR6tY" for m in kept)

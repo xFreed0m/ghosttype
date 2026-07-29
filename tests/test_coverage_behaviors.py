@@ -6,28 +6,25 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
-import pytest
 from click.testing import CliRunner
-
 from ghosttype import pattern_engine
 from ghosttype.cli import cli
 from ghosttype.models import (
-    ConversationRecord,
-    Finding,
     SOURCE_PATTERN,
     SOURCE_TRUFFLEHOG,
+    ConversationRecord,
+    Finding,
     TextChunk,
 )
 from ghosttype.scanner import Orchestrator
 
-
 # ---------------------------------------------------------------------------
 # pattern_engine
 # ---------------------------------------------------------------------------
+
 
 def _rec(tmp_path) -> ConversationRecord:
     p = tmp_path / "s.jsonl"
@@ -36,7 +33,7 @@ def _rec(tmp_path) -> ConversationRecord:
         source_path=p,
         tool="claude_code",
         conversation_id="c1",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         raw=None,
     )
 
@@ -121,9 +118,8 @@ def test_orchestrator_skips_scanner_whose_discover_raises(caplog):
     s.discover.side_effect = RuntimeError("disk gone")
     with patch("ghosttype.scanner.trufflehog_scan_chunks", return_value=[]), patch(
         "ghosttype.pattern_engine.scan_chunks", return_value=[]
-    ):
-        with caplog.at_level(logging.WARNING):
-            findings = Orchestrator(scanners=[s]).run()
+    ), caplog.at_level(logging.WARNING):
+        findings = Orchestrator(scanners=[s]).run()
     assert findings == []
     assert "failed during discover" in caplog.text
 
@@ -135,7 +131,7 @@ def test_orchestrator_continues_when_one_records_extract_raises(tmp_path, caplog
         source_path=tmp_path / "bad.jsonl",
         tool="fake",
         conversation_id="bad",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         raw=None,
     )
     (tmp_path / "bad.jsonl").write_text("x")
@@ -155,9 +151,8 @@ def test_orchestrator_continues_when_one_records_extract_raises(tmp_path, caplog
 
     with patch("ghosttype.scanner.trufflehog_scan_chunks", side_effect=fake_engine), patch(
         "ghosttype.pattern_engine.scan_chunks", return_value=[]
-    ):
-        with caplog.at_level(logging.WARNING):
-            Orchestrator(scanners=[s]).run()
+    ), caplog.at_level(logging.WARNING):
+        Orchestrator(scanners=[s]).run()
     assert "failed extracting" in caplog.text
     # the good record's chunk still reached the engine
     assert len(captured["chunks"]) == 1
@@ -169,9 +164,8 @@ def test_orchestrator_verbose_logs_when_no_chunks(tmp_path, caplog):
     s.extract_text.return_value = []  # discovered but nothing extractable
     with patch("ghosttype.scanner.trufflehog_scan_chunks") as eng, patch(
         "ghosttype.pattern_engine.scan_chunks"
-    ):
-        with caplog.at_level(logging.INFO):
-            Orchestrator(scanners=[s], verbose=True).run()
+    ), caplog.at_level(logging.INFO):
+        Orchestrator(scanners=[s], verbose=True).run()
     eng.assert_not_called()
     assert "extracted 0 text chunks" in caplog.text
 
@@ -186,20 +180,19 @@ def test_orchestrator_verbose_logs_engine_and_dedup_counts(tmp_path, caplog):
     shared = Finding(
         tool="fake", secret_type="github", secret_value="dup",
         file_path=rec.source_path, position="l:1", confidence="unverified",
-        context="dup", discovered_at=datetime.now(timezone.utc),
+        context="dup", discovered_at=datetime.now(UTC),
         source=SOURCE_TRUFFLEHOG,
     )
     pat_dup = Finding(
         tool="fake", secret_type="github_pat_classic", secret_value="dup",
         file_path=rec.source_path, position="l:1:0", confidence="high",
-        context="dup", discovered_at=datetime.now(timezone.utc),
+        context="dup", discovered_at=datetime.now(UTC),
         source=SOURCE_PATTERN,
     )
     with patch("ghosttype.scanner.trufflehog_scan_chunks", return_value=[shared]), patch(
         "ghosttype.pattern_engine.scan_chunks", return_value=[pat_dup]
-    ):
-        with caplog.at_level(logging.INFO):
-            findings = Orchestrator(scanners=[s], verbose=True, engine="both").run()
+    ), caplog.at_level(logging.INFO):
+        findings = Orchestrator(scanners=[s], verbose=True, engine="both").run()
     # overlap on (value,file) -> TruffleHog kept, pattern shadowed
     assert len(findings) == 1
     assert findings[0].source == SOURCE_TRUFFLEHOG
@@ -215,7 +208,7 @@ def _finding(tmp_path, **kw) -> Finding:
         tool="claude_code", secret_type="github", secret_value="ghp_v",
         file_path=tmp_path / "s.jsonl", position="line:1",
         confidence="unverified", context="ghp_v",
-        discovered_at=datetime.now(timezone.utc), verified=False,
+        discovered_at=datetime.now(UTC), verified=False,
         detector_name="Github", source=SOURCE_TRUFFLEHOG,
     )
     base.update(kw)

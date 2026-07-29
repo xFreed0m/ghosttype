@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import logging
 import subprocess
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from ghosttype.models import ConversationRecord, TextChunk
@@ -36,7 +36,7 @@ class ChatGPTScanner(Scanner):
                 source_path=data_file,
                 tool=self.name,
                 conversation_id=data_file.stem,
-                created_at=datetime.fromtimestamp(stat.st_mtime, tz=timezone.utc),
+                created_at=datetime.fromtimestamp(stat.st_mtime, tz=UTC),
                 raw=None,
             ))
         return records
@@ -51,7 +51,7 @@ class ChatGPTScanner(Scanner):
                 )
                 if result.returncode == 0 and result.stdout.strip():
                     return result.stdout.strip().encode()
-            except (subprocess.TimeoutExpired, FileNotFoundError):
+            except (subprocess.TimeoutExpired, FileNotFoundError, PermissionError, OSError):
                 continue
         return None
 
@@ -77,8 +77,9 @@ class ChatGPTScanner(Scanner):
 
         try:
             from hashlib import pbkdf2_hmac
-            from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+
             from cryptography.hazmat.primitives import padding as sym_padding
+            from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
             key = pbkdf2_hmac("sha1", key_bytes, b"saltysalt", 1003, dklen=16)
             iv = b" " * 16

@@ -1,10 +1,8 @@
 import csv
 import json
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 
 import pytest
-
 from ghosttype.models import Finding
 from ghosttype.report import copy_sources, write_csv, write_json
 
@@ -13,7 +11,7 @@ from ghosttype.report import copy_sources, write_csv, write_json
 def findings(tmp_path):
     src = tmp_path / "session.jsonl"
     src.write_text('{"type":"user","message":{"content":"hi"}}\n')
-    now = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    now = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
     return [
         Finding(
             tool="claude_code",

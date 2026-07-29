@@ -25,6 +25,7 @@ def _secure_opener(path: str, flags: int) -> int:
     os.fchmod(fd, _OWNER_ONLY)
     return fd
 
+
 _FIELDS = [
     "tool",
     "source",
@@ -111,7 +112,7 @@ def write_json(findings: list[Finding], path: Path, redact: bool = False) -> Non
                 [finding_to_dict(f, redact=redact) for f in findings], indent=2
             )
         )
-    os.chmod(path, _OWNER_ONLY)
+    Path(path).chmod(_OWNER_ONLY)
 
 
 def write_csv(findings: list[Finding], path: Path, redact: bool = False) -> None:
@@ -126,7 +127,7 @@ def write_csv(findings: list[Finding], path: Path, redact: bool = False) -> None
             row = finding_to_dict(f, redact=redact)
             row["extra_data"] = json.dumps(row.get("extra_data") or {}, sort_keys=True)
             writer.writerow(row)
-    os.chmod(path, _OWNER_ONLY)
+    Path(path).chmod(_OWNER_ONLY)
 
 
 def copy_sources(findings: list[Finding], sources_dir: Path) -> None:

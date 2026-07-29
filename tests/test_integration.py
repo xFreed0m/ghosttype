@@ -22,14 +22,13 @@ import shutil
 import sqlite3
 from contextlib import closing
 from pathlib import Path
-from unittest.mock import patch, PropertyMock
+from unittest.mock import PropertyMock, patch
 
 import pytest
-
+from ghosttype.report import write_csv, write_json
+from ghosttype.scanner import Orchestrator
 from ghosttype.scanners.claude_code import ClaudeCodeScanner
 from ghosttype.scanners.cursor import CursorScanner
-from ghosttype.scanner import Orchestrator
-from ghosttype.report import write_csv, write_json
 
 requires_trufflehog = pytest.mark.skipif(
     shutil.which("trufflehog") is None,

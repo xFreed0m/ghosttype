@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -132,7 +132,7 @@ class ClaudeCodeScanner(Scanner):
                         tool=self.name,
                         conversation_id=jsonl_path.stem,
                         created_at=datetime.fromtimestamp(
-                            jsonl_path.stat().st_mtime, tz=timezone.utc
+                            jsonl_path.stat().st_mtime, tz=UTC
                         ),
                         raw=None,
                     )
@@ -146,7 +146,7 @@ class ClaudeCodeScanner(Scanner):
                 tool=self.name,
                 conversation_id="history",
                 created_at=datetime.fromtimestamp(
-                    history_path.stat().st_mtime, tz=timezone.utc
+                    history_path.stat().st_mtime, tz=UTC
                 ),
                 raw={"source_type": "history"},
             ))
@@ -160,7 +160,7 @@ class ClaudeCodeScanner(Scanner):
                     tool=self.name,
                     conversation_id=task_file.stem,
                     created_at=datetime.fromtimestamp(
-                        task_file.stat().st_mtime, tz=timezone.utc
+                        task_file.stat().st_mtime, tz=UTC
                     ),
                     raw={"source_type": "task"},
                 ))
@@ -174,10 +174,9 @@ class ClaudeCodeScanner(Scanner):
 
         if source_type == "history":
             return self._extract_history(record)
-        elif source_type == "task":
+        if source_type == "task":
             return self._extract_task(record)
-        else:
-            return self._extract_session(record)
+        return self._extract_session(record)
 
     def _extract_session(self, record: ConversationRecord) -> list[TextChunk]:
         """Extract text-bearing content from every record type that can carry

@@ -2,17 +2,15 @@
 trufflehog or run the real regex engine in unit tests."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from pathlib import Path
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
 import pytest
-
 from ghosttype.models import (
-    ConversationRecord,
-    Finding,
     SOURCE_PATTERN,
     SOURCE_TRUFFLEHOG,
+    ConversationRecord,
+    Finding,
     TextChunk,
 )
 from ghosttype.scanner import Orchestrator
@@ -26,7 +24,7 @@ def mock_scanner(tmp_path):
         source_path=src,
         tool="fake_tool",
         conversation_id="conv-1",
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         raw={},
     )
     chunk = TextChunk(text="GITHUB_TOKEN=ghp_xxx", position="line:1", record=rec)
@@ -47,7 +45,7 @@ def _th_finding(tool, value, source_path, verified=False) -> Finding:
         position="line:1",
         confidence="verified" if verified else "unverified",
         context=value,
-        discovered_at=datetime.now(timezone.utc),
+        discovered_at=datetime.now(UTC),
         severity="critical" if verified else "high",
         verified=verified,
         detector_name="Github",
@@ -64,7 +62,7 @@ def _pat_finding(tool, value, source_path, secret_type="github_pat_classic") -> 
         position="line:1:0",
         confidence="high",
         context=value,
-        discovered_at=datetime.now(timezone.utc),
+        discovered_at=datetime.now(UTC),
         severity="critical",
         verified=False,
         detector_name="",
@@ -151,7 +149,7 @@ def test_orchestrator_max_age_filter(mock_scanner, tmp_path):
         source_path=tmp_path / "old.jsonl",
         tool="fake_tool",
         conversation_id="old",
-        created_at=datetime(2020, 1, 1, tzinfo=timezone.utc),
+        created_at=datetime(2020, 1, 1, tzinfo=UTC),
         raw={},
     )
     (tmp_path / "old.jsonl").write_text("x")

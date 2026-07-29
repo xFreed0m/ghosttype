@@ -1,13 +1,12 @@
 """CLI tests: the engine and orchestrator are mocked so we don't shell out."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import patch
 
 from click.testing import CliRunner
-
-from ghosttype.cli import cli, VERSION
+from ghosttype.cli import VERSION, cli
 from ghosttype.models import Finding
 
 
@@ -20,7 +19,7 @@ def _make_finding(tmp_path: Path, *, verified: bool = False) -> Finding:
         position="line:1",
         confidence="verified" if verified else "unverified",
         context="ghp_xxx",
-        discovered_at=datetime.now(timezone.utc),
+        discovered_at=datetime.now(UTC),
         severity="critical" if verified else "high",
         verified=verified,
         detector_name="Github",
@@ -336,7 +335,6 @@ def test_scan_only_verified_alone_still_works(tmp_path, monkeypatch):
 def test_engine_build_argv_rejects_no_verify_with_only_verified():
     """Defense-in-depth for programmatic callers that bypass the CLI guard."""
     import pytest
-
     from ghosttype.trufflehog_engine import _build_argv
 
     with pytest.raises(ValueError, match="incompatible"):

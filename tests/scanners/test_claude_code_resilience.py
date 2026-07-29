@@ -7,10 +7,8 @@ Every assertion checks an observable outcome.
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-
-import pytest
 
 from ghosttype.models import ConversationRecord
 from ghosttype.scanners.claude_code import (
@@ -24,7 +22,7 @@ def _session_rec(path: Path) -> ConversationRecord:
         source_path=path,
         tool="claude_code",
         conversation_id=path.stem,
-        created_at=datetime.now(timezone.utc),
+        created_at=datetime.now(UTC),
         raw=None,
     )
 
@@ -103,7 +101,7 @@ def test_history_skips_blank_malformed_slash_and_short(tmp_path):
     )
     rec = ConversationRecord(
         source_path=p, tool="claude_code", conversation_id="history",
-        created_at=datetime.now(timezone.utc), raw={"source_type": "history"},
+        created_at=datetime.now(UTC), raw={"source_type": "history"},
     )
     chunks = ClaudeCodeScanner().extract_text(rec)
     assert len(chunks) == 1
@@ -117,7 +115,7 @@ def test_history_unreadable_is_logged_not_raised(tmp_path, caplog):
     d.mkdir()
     rec = ConversationRecord(
         source_path=d, tool="claude_code", conversation_id="history",
-        created_at=datetime.now(timezone.utc), raw={"source_type": "history"},
+        created_at=datetime.now(UTC), raw={"source_type": "history"},
     )
     with caplog.at_level(logging.WARNING):
         assert ClaudeCodeScanner().extract_text(rec) == []
@@ -133,7 +131,7 @@ def test_task_malformed_json_is_logged_not_raised(tmp_path, caplog):
     p.write_text("{ not valid json ")
     rec = ConversationRecord(
         source_path=p, tool="claude_code", conversation_id="t",
-        created_at=datetime.now(timezone.utc), raw={"source_type": "task"},
+        created_at=datetime.now(UTC), raw={"source_type": "task"},
     )
     with caplog.at_level(logging.WARNING):
         assert ClaudeCodeScanner().extract_text(rec) == []
@@ -214,7 +212,7 @@ def test_task_with_only_short_strings_yields_no_chunk(tmp_path):
     p.write_text(json.dumps({"a": "x", "b": "y", "n": 1}))
     rec = ConversationRecord(
         source_path=p, tool="claude_code", conversation_id="t",
-        created_at=datetime.now(timezone.utc), raw={"source_type": "task"},
+        created_at=datetime.now(UTC), raw={"source_type": "task"},
     )
     assert ClaudeCodeScanner().extract_text(rec) == []
 

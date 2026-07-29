@@ -1,14 +1,16 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
-from ghosttype.models import ConversationRecord, Finding, SOURCE_TRUFFLEHOG
-from ghosttype.scanners.base import Scanner
 from ghosttype import pattern_engine
+from ghosttype.models import SOURCE_TRUFFLEHOG, ConversationRecord, Finding
+from ghosttype.scanners.base import Scanner
 from ghosttype.trufflehog_engine import (
     DEFAULT_CONTEXT_WINDOW,
     DEFAULT_TIMEOUT_SECONDS,
+)
+from ghosttype.trufflehog_engine import (
     scan_chunks as trufflehog_scan_chunks,
 )
 
@@ -135,7 +137,7 @@ class Orchestrator:
         self.chunks_scanned = 0
         cutoff: datetime | None = None
         if self._max_age_days is not None:
-            cutoff = datetime.now(timezone.utc) - timedelta(days=self._max_age_days)
+            cutoff = datetime.now(UTC) - timedelta(days=self._max_age_days)
 
         for scanner in self._scanners:
             if tool_filter and scanner.name != tool_filter:

@@ -64,17 +64,17 @@ _REGEX_PATTERNS: list[tuple[str, re.Pattern[str]]] = [
     # GitHub refresh tokens
     ("github_refresh_token", re.compile(r"\b(ghr_[a-zA-Z0-9]{76})\b")),
     # GCP API keys (browser/server keys)
-    ("gcp_api_key",         re.compile(r"\b(AIzaSy[a-zA-Z0-9_-]{33})\b")),
+    ("gcp_api_key", re.compile(r"\b(AIzaSy[a-zA-Z0-9_-]{33})\b")),
     # AWS STS temporary tokens (ASIA prefix)
-    ("aws_sts_token",       re.compile(r"(?<![A-Z0-9])(ASIA[0-9A-Z]{16})(?![A-Z0-9])")),
+    ("aws_sts_token", re.compile(r"(?<![A-Z0-9])(ASIA[0-9A-Z]{16})(?![A-Z0-9])")),
     # Docker Hub personal access tokens
-    ("dockerhub_token",     re.compile(r"\b(dckr_pat_[a-zA-Z0-9_-]{20,})\b")),
+    ("dockerhub_token", re.compile(r"\b(dckr_pat_[a-zA-Z0-9_-]{20,})\b")),
     # Pulumi access tokens
-    ("pulumi_token",        re.compile(r"\b(pul-[a-zA-Z0-9]{40})\b")),
+    ("pulumi_token", re.compile(r"\b(pul-[a-zA-Z0-9]{40})\b")),
     # Doppler service tokens
-    ("doppler_token",       re.compile(r"\b(dp\.st\.[a-zA-Z0-9]{43})\b")),
+    ("doppler_token", re.compile(r"\b(dp\.st\.[a-zA-Z0-9]{43})\b")),
     # PyPI API tokens
-    ("pypi_token",          re.compile(r"\b(pypi-[a-zA-Z0-9_-]{100,})\b")),
+    ("pypi_token", re.compile(r"\b(pypi-[a-zA-Z0-9_-]{100,})\b")),
 ]
 
 # Layer 2: variable-name context signals (confidence: medium)
