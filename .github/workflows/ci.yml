@@ -169,7 +169,7 @@ jobs:
           languages: python
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@ff2f1c621b7f889edc0d3c761ac2e6a3f8cdb0dd # v4.37.7
+        uses: github/codeql-action/analyze@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
 
       # Opengrep (OSS LGPL-2.1 fork of the Semgrep engine) second-opinion SAST.
       # No blanket suppression: the ONE documented exception is the forensic
