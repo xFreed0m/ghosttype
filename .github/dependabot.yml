@@ -11,6 +11,11 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "deps"
+    # codeql-action init/analyze must run the same version or CodeQL errors out.
+    groups:
+      codeql-action:
+        patterns:
+          - "github/codeql-action*"
 
   # Python deps. Dependabot reads pyproject.toml for constraints and updates
   # requirements.lock (the hashed closure) alongside it.
