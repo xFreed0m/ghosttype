@@ -5,4 +5,4 @@
 # These tools never ship to users; they run only in CI jobs.
 pip-audit==2.10.1
 zizmor==1.32.0
-cyclonedx-bom==8.0.1
+cyclonedx-bom==9.0.0
